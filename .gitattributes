@@ -1,0 +1,8 @@
+# Line endings as checked by tools/audit_sources.py: .bat CRLF, every other text file LF.
+* text=auto eol=lf
+*.bat text eol=crlf
+
+*.png binary
+*.ico binary
+*.docx binary
+*.pdf binary

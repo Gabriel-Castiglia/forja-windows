@@ -1,0 +1,43 @@
+# --- Build output (build.bat) ---
+build/
+*.o
+*.res
+
+# --- Settings written next to the executable ---
+randompassgen.ini
+
+# --- Saved password lists: never commit them ---
+passwords*.txt
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+
+# --- Office temporary files (make_guide.py / make_pdf.ps1) ---
+~$*.docx
+~$*.doc
+
+# --- Code signing (never commit certificates or secrets) ---
+*.pfx
+*.p12
+*.cer
+.env
+.env.*
+
+# --- IDE / editor ---
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- OS ---
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+
+# --- Logs / temp ---
+*.log
+*.tmp
