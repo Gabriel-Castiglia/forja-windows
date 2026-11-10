@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 — 2026-11-10
+
+- The setup creates the desktop shortcut unless you untick it (it was unticked by default).
+
 ## 2.0.1 — 2026-11-10
 
 - The About window shows the project page; the user guides link to it and say that Wyrmhold is for x64 Windows

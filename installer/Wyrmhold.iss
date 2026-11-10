@@ -58,7 +58,7 @@ ja.RemoveSettings=Wyrmhold の設定（言語・テーマ・最後のオプシ�
 es.RemoveSettings=¿Borrar también la configuración de Wyrmhold (idioma, tema, últimas opciones)?
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
 Source: "..\build\wyrmhold.exe"; DestDir: "{app}"; Flags: ignoreversion
