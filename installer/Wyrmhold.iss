@@ -1,8 +1,11 @@
 ; Wyrmhold installer (Inno Setup 6), in English, Japanese and Spanish.
 ; Built by tools/make_installer.ps1, which passes /DAppVersion.
-; Author: Gabriel Castiglia - 2026-11-10
+; Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+; Date: November 10, 2026
+; SPDX-License-Identifier: GPL-2.0-only
+; AppVersion is always passed by tools\make_installer.ps1, which reads it from src\version.h.
 #ifndef AppVersion
-  #define AppVersion "2.0.0"
+  #define AppVersion "0.0.0"
 #endif
 
 [Setup]

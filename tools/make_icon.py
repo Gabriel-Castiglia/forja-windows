@@ -1,6 +1,8 @@
 """
 Wyrmhold -- draws the application icon: a dragon guarding its tower.
-Author: Gabriel Castiglia - 2026-11-10
+Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+Date: November 10, 2026
+SPDX-License-Identifier: GPL-2.0-only
 
 Engraving style: Athanasius Kircher's winged dragon
 (Mundus Subterraneus, Amsterdam 1665; public domain, scan from Wikimedia Commons) lies

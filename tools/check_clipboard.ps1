@@ -1,5 +1,7 @@
 # Wyrmhold -- clipboard behaviour, checked from outside the program.
-# Author: Gabriel Castiglia - 2026-11-09
+# Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+# Date: November 9, 2026
+# SPDX-License-Identifier: GPL-2.0-only
 #
 # Run it in an interactive desktop session with Windows PowerShell 5.1 (STA, needed to read
 # the clipboard). It starts the program, sends it menu commands with PostMessage (same

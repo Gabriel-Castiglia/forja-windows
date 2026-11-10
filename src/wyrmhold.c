@@ -1,6 +1,8 @@
 /**
   Wyrmhold -- the window.
-  Author: Gabriel Castiglia - 2026-11-09 (2.0.0: 2026-11-10)
+  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+  Date: November 9, 2026
+  SPDX-License-Identifier: GPL-2.0-only
 
   A Win32 front end for the engine in pwgen.h. One portable, statically linked executable:
   installed with its setup, or run portable. The settings it remembers go to
@@ -71,8 +73,13 @@
 #include "pwgen.h"
 #include "resource.h"
 #include "ui_strings.h"
+#include "version.h"
 
-#define APP_VERSION   L"2.0.0"
+#define WIDEN_(s)     L##s
+#define WIDEN(s)      WIDEN_(s)
+#define APP_VERSION   WIDEN(WH_VERSION_STR)
+#define APP_DATE      WIDEN(WH_DATE_STR)
+#define APP_REPO      WIDEN(WH_REPO_STR)
 #define APP_AUTHOR    L"Gabriel Castiglia"
 #define APP_AUMID     L"Castiglia.Wyrmhold"
 #define INI_SECTION   L"settings"
@@ -2671,7 +2678,7 @@ static void showHelp(HWND owner)
 
 /* ------------------------------------------------------------------ about window */
 
-/* Icon, name, version (from APP_VERSION), date, author, what the name means, what the
+/* Icon, name, version and date (from version.h), author, project page, what the name means, what the
  * program does, the credits and the licence. The height is measured from the text, so it fits in all
  * three languages. */
 
@@ -2728,12 +2735,14 @@ static LRESULT CALLBACK aboutProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		SetRect(&t, tx, SC(AB_M - 4), rc.right - SC(AB_M), SC(AB_M + 32));
 		drawText(mem, T(S_ABOUT_NAME), -1, &t, fTitle, PAL.text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
 		/* built here, so it can never disagree with the executable that prints it */
-		_snwprintf(line, 128, T(S_ABOUT_VERSION), APP_VERSION); line[127] = 0;
+		_snwprintf(line, 128, T(S_ABOUT_VERSION), APP_VERSION, APP_DATE); line[127] = 0;
 		SetRect(&t, tx + SC(2), SC(AB_M + 36), rc.right, SC(AB_M + 58));
 		drawText(mem, line, -1, &t, fUi, PAL.hint, DT_LEFT | DT_SINGLELINE);
 		_snwprintf(line, 128, T(S_ABOUT_AUTHOR), APP_AUTHOR); line[127] = 0;
 		SetRect(&t, tx + SC(2), SC(AB_M + 60), rc.right, SC(AB_M + 84));
 		drawText(mem, line, -1, &t, fBold, PAL.text, DT_LEFT | DT_SINGLELINE);
+		SetRect(&t, tx + SC(2), SC(AB_M + 88), rc.right - SC(AB_M), SC(AB_M + 110));
+		drawText(mem, APP_REPO, -1, &t, fSmall, PAL.hint, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
 
 		wdt = rc.right - 2 * SC(AB_M);
 		SetRect(&t, SC(AB_M), SC(AB_TEXT), rc.right - SC(AB_M), rc.bottom);
@@ -3441,9 +3450,9 @@ static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 /* ------------------------------------------------------------------ command line */
 
-static int writeAuto(const char* path, const PwOptions* o, int count)
+static int writeAuto(const wchar_t* path, const PwOptions* o, int count)
 {
-	FILE* f = fopen(path, "wb");
+	FILE* f = path ? _wfopen(path, L"wb") : NULL;
 	char pw[PW_OUT_MAX];
 	int i;
 
@@ -3451,7 +3460,7 @@ static int writeAuto(const char* path, const PwOptions* o, int count)
 	if (pw_check(o, NULL) != PW_OK) { fclose(f); return 5; }
 	for (i = 0; i < count; i++)
 	{
-		if (!pw_make(o, pw)) { fclose(f); return 3; }
+		if (!pw_make(o, pw)) { SecureZeroMemory(pw, sizeof(pw)); fclose(f); return 3; }
 		fputs(pw, f);
 		fputs("\r\n", f);
 	}
@@ -3459,9 +3468,9 @@ static int writeAuto(const char* path, const PwOptions* o, int count)
 	return fclose(f) == 0 ? 0 : 2;
 }
 
-static int writeEntropy(const char* path, const PwOptions* o)
+static int writeEntropy(const wchar_t* path, const PwOptions* o)
 {
-	FILE* f = fopen(path, "wb");
+	FILE* f = path ? _wfopen(path, L"wb") : NULL;
 
 	if (!f) return 2;
 	fprintf(f, "%.6f %d %d\r\n", pw_entropy(o), pw_pool(o), pw_check(o, NULL));
@@ -3469,7 +3478,7 @@ static int writeEntropy(const char* path, const PwOptions* o)
 }
 
 /* Draws the window (or the Help / About box in front of it) into a 32-bit BMP. */
-static int saveShot(HWND w, const char* path)
+static int saveShot(HWND w, const wchar_t* path)
 {
 	RECT r;
 	int cx, cy, ok = 0;
@@ -3498,7 +3507,7 @@ static int saveShot(HWND w, const char* path)
 
 	if (PrintWindow(w, mem, PW_RENDERFULLCONTENT))
 	{
-		FILE* f = fopen(path, "wb");
+		FILE* f = path ? _wfopen(path, L"wb") : NULL;
 		if (f)
 		{
 			BITMAPFILEHEADER fh;
@@ -3532,6 +3541,21 @@ static void pump(DWORD ms)
 		while (PeekMessageW(&m, NULL, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
 		Sleep(10);
 	}
+}
+
+/* The text after "/key:" in the wide command line, or NULL: file names keep every character,
+ * whatever the ANSI code page (the narrow __argv would turn the rest into question marks). */
+static const wchar_t* widePathArg(const wchar_t* key)
+{
+	static LPWSTR* argv;
+	static int argc;
+	size_t n = wcslen(key);
+	int i;
+
+	if (!argv) argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+	for (i = 1; argv && i < argc; i++)
+		if ((argv[i][0] == L'/' || argv[i][0] == L'-') && !_wcsnicmp(argv[i] + 1, key, n)) return argv[i] + 1 + n;
+	return NULL;
 }
 
 /* Command-line options onto a set of options. Returns 1 if any password option was given. */
@@ -3618,7 +3642,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 
 	gInst = inst;
 	loadLayer();
-	iniPath();
 
 	for (i = 1; i < __argc; i++)
 	{
@@ -3651,10 +3674,12 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		if (preset >= 0 && preset < P_COUNT) presetOptions(preset, &o, &nr);
 		o.noRepeat = nr;
 		strcpy(o.exclude, ex);
-		if (entPath) return writeEntropy(entPath, &o);
-		return writeAuto(outPath, &o, clampInt(count, 1, AUTO_MAX));
+		if (entPath) return writeEntropy(widePathArg(L"entropy:"), &o);
+		return writeAuto(widePathArg(L"out:"), &o, clampInt(count, 1, AUTO_MAX));
 	}
 
+	/* only the window remembers settings: the command line above leaves no folder behind */
+	iniPath();
 	if (shotPath) gNoSave = 1;
 
 	setAppId();
@@ -3755,7 +3780,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		if (openWhat && !_stricmp(openWhat, "about")) { showAbout(hMain); target = hAboutWnd; }
 		if (openWhat && !_stricmp(openWhat, "theme")) { showTheme(hMain); target = hThemeWnd; }
 		pump(700);
-		rc = saveShot(target, shotPath);
+		rc = saveShot(target, widePathArg(L"shot:"));
 		DestroyWindow(hMain);
 		GdiplusShutdown(gGdipToken);
 		return rc;

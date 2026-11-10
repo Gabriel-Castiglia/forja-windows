@@ -1,6 +1,8 @@
 """
 Wyrmhold -- the setup wizard's pictures (installer/wizard.bmp, installer/wizard-small.bmp).
-Author: Gabriel Castiglia - 2026-11-10
+Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+Date: November 10, 2026
+SPDX-License-Identifier: GPL-2.0-only
 
 The side panel: the icon's engraving on the default black, a soft glow of the dragon's fire
 behind it, the name and a line in the three languages' common script (Latin). The small

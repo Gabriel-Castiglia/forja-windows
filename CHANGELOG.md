@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 — 2026-11-10
+
+- The About window shows the project page; the user guides link to it and say that Wyrmhold is for x64 Windows
+  (there is no ARM build).
+- `/out`, `/entropy` and `/shot` accept file names in any language (they were read in the ANSI code page).
+- Using only the command line no longer creates an empty settings folder in `%APPDATA%`.
+- The version is written once, in `src/version.h`; every source file carries the GPL-2.0-only header.
+
 ## 2.0.0 — 2026-11-10
 
 - New name: **Wyrmhold** — Old English *wyrm*, dragon, and *hold*, stronghold: the dragon's keep. New icon:

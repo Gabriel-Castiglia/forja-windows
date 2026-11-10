@@ -1,7 +1,9 @@
 """
 Wyrmhold -- checks a file written with /out against the standard
 rules (the four classes, basic symbols), independently of the C code.
-Author: Gabriel Castiglia - 2026-11-09
+Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+Date: November 9, 2026
+SPDX-License-Identifier: GPL-2.0-only
 
     python tools/check_passwords.py <file> <length> <avoid 1|0> [expected count]
 

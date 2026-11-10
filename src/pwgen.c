@@ -1,6 +1,8 @@
 /**
   Wyrmhold -- the engine. See pwgen.h for the rules and the method.
-  Author: Gabriel Castiglia - 2026-11-09 (2.0.0: 2026-11-10)
+  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+  Date: November 9, 2026
+  SPDX-License-Identifier: GPL-2.0-only
 **/
 
 #include <windows.h>

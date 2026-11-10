@@ -1,6 +1,8 @@
 @echo off
 rem  Wyrmhold -- builds build\wyrmhold.exe from src\.
-rem  Author: Gabriel Castiglia - 2026-11-09
+rem  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+rem  Date: November 9, 2026
+rem  SPDX-License-Identifier: GPL-2.0-only
 rem
 rem  Needs mingw-w64 GCC on the PATH (MSYS2 mingw64) and nothing else. The executable is
 rem  static: it runs on a machine with no runtime installed, from any folder (portable).

@@ -1,7 +1,9 @@
 """
 Wyrmhold -- checks the generator options through the command line,
 independently of the C code.
-Author: Gabriel Castiglia - 2026-11-10
+Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+Date: November 10, 2026
+SPDX-License-Identifier: GPL-2.0-only
 
     python tools/check_options.py <wyrmhold.exe>
 

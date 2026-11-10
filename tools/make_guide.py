@@ -1,7 +1,9 @@
 """
 Wyrmhold -- writes the user guide in English, Japanese and Spanish
 (docs/wyrmhold_guide_<lang>.docx). The PDFs are made from them by tools/make_pdf.ps1.
-Author: Gabriel Castiglia - 2026-11-09 (2.0.0: 2026-11-10)
+Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+Date: November 9, 2026
+SPDX-License-Identifier: GPL-2.0-only
 
     python tools/make_guide.py
 
@@ -21,10 +23,11 @@ from docx.shared import Cm, Pt, RGBColor
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 IMAGES = DOCS / "images"
-VERSION = re.search(r'#define APP_VERSION\s+L"([\d.]+)"',
-                    (ROOT / "src" / "wyrmhold.c").read_text(encoding="utf-8")).group(1)
+_VERSION_H = (ROOT / "src" / "version.h").read_text(encoding="utf-8")
+VERSION = re.search(r'#define WH_VERSION_STR\s+"([\d.]+)"', _VERSION_H).group(1)
+DATE = re.search(r'#define WH_DATE_STR\s+"([\d-]+)"', _VERSION_H).group(1)
+REPO = re.search(r'#define WH_REPO_STR\s+"([^"]+)"', _VERSION_H).group(1)
 AUTHOR = "Gabriel Castiglia"
-DATE = "2026-11-10"
 ACCENT = RGBColor(0x22, 0x24, 0x2C)       # the default black of the icon
 GREY = RGBColor(0x5F, 0x6B, 0x78)
 
@@ -40,7 +43,7 @@ GUIDES = {
             ("p", "Wyrmhold makes strong random passwords, passphrases and PINs on your own computer: for a zip, 7z or rar file sent by email, a new account, a Wi-Fi network or a lock. Nothing is stored or sent anywhere: the passwords exist only in the window until you copy or save them."),
             ("p", "The name: \u201Cwyrm\u201D is the Old English word for dragon, and \u201Chold\u201D a stronghold. A wyrmhold is the dragon\u2019s keep, where a dragon guards its hoard \u2014 as this program guards your passwords. The icon shows it: Athanasius Kircher\u2019s winged dragon (Mundus Subterraneus, 1665) watching over its tower, with a lit keyhole in the window."),
             ("h", "2. Installing and removing it"),
-            ("p", "Windows 10 or 11, 64-bit. Run Wyrmhold-Setup-" + VERSION + ".exe and choose the language of the setup: English, Japanese or Spanish. By default it installs for your user only, with no administrator rights; the first page also offers to install it for all users. It adds Wyrmhold and the user guide to the Start menu, and a desktop shortcut if you tick it. The program starts in the language you chose for the setup."),
+            ("p", "Windows 10 or 11 on a 64-bit Intel or AMD processor (x64); there is no version for ARM processors. Run Wyrmhold-Setup-" + VERSION + ".exe and choose the language of the setup: English, Japanese or Spanish. By default it installs for your user only, with no administrator rights; the first page also offers to install it for all users. It adds Wyrmhold and the user guide to the Start menu, and a desktop shortcut if you tick it. The program starts in the language you chose for the setup."),
             ("p", "To remove it: Settings \u2192 Apps \u2192 Installed apps \u2192 Wyrmhold \u2192 Uninstall. The uninstaller removes every file it installed and then asks whether to delete your settings too."),
             ("p", "Portable use: wyrmhold.exe is a single file that needs nothing else. To run it from a USB stick or a shared folder without installing, copy it there together with an empty file named wyrmhold.ini: the settings are then kept in that file."),
             ("h", "3. The window"),
@@ -83,6 +86,7 @@ GUIDES = {
             ("p", "The source is C (Win32). With MSYS2 mingw-w64 GCC in C:\\msys64, build.bat writes build\\wyrmhold.exe; tools\\make_installer.ps1 builds the setup with Inno Setup 6. tools\\run_checks.ps1 and tools\\check_options.py check the passwords and the exact entropy against independent counts, and tools\\check_clipboard.ps1 the clipboard."),
             ("h", "13. License and credits"),
             ("p", "Free software under the GNU General Public License, version 2 (GPL-2.0-only): you may use, copy, study and change it, and anyone who passes it on must do so under the same license, with the source code. It comes with no warranty. The full text is in LICENSE.txt. \u00A9 2026 Gabriel Castiglia."),
+            ("p", "Source code, releases and updates: https://" + REPO),
             ("p", "Passphrase words: the EFF large word list, by the Electronic Frontier Foundation, under CC BY 3.0 US (eff.org/dice). Icon: the winged dragon from Athanasius Kircher, Mundus Subterraneus (Amsterdam, 1665), public domain."),
         ],
     },
@@ -95,7 +99,7 @@ GUIDES = {
             ("p", "Wyrmhold は、強力なランダムパスワード・パスフレーズ・PIN をお使いのコンピューター上で作ります。メールで送る zip・7z・rar ファイル、新しいアカウント、Wi-Fi、ロックなどに使えます。何も保存・送信しません。パスワードはコピーまたは保存するまで、このウィンドウの中にだけ存在します。"),
             ("p", "名前の由来:「wyrm」は古英語で「竜」、「hold」は「砦」を意味します。Wyrmhold は竜が宝を守る砦のこと \u2014 このプログラムがあなたのパスワードを守るように。アイコンはそれを表しています。アタナシウス・キルヒャー『地下世界』(1665 年)の翼のある竜が塔を見張り、窓には鍵穴が灯っています。"),
             ("h", "2. インストールとアンインストール"),
-            ("p", "Windows 10 または 11(64 ビット)。Wyrmhold-Setup-" + VERSION + ".exe を実行し、セットアップの言語(英語・日本語・スペイン語)を選びます。既定では管理者権限なしで現在のユーザーにインストールされます。最初のページで全ユーザー向けのインストールも選べます。スタートメニューに Wyrmhold とユーザーガイドが追加され、チェックすればデスクトップにショートカットも作られます。プログラムはセットアップで選んだ言語で起動します。"),
+            ("p", "Windows 10 または 11、64 ビットの Intel または AMD プロセッサー(x64)。ARM プロセッサー用の版はありません。Wyrmhold-Setup-" + VERSION + ".exe を実行し、セットアップの言語(英語・日本語・スペイン語)を選びます。既定では管理者権限なしで現在のユーザーにインストールされます。最初のページで全ユーザー向けのインストールも選べます。スタートメニューに Wyrmhold とユーザーガイドが追加され、チェックすればデスクトップにショートカットも作られます。プログラムはセットアップで選んだ言語で起動します。"),
             ("p", "削除するには:設定 \u2192 アプリ \u2192 インストールされているアプリ \u2192 Wyrmhold \u2192 アンインストール。インストールしたファイルをすべて削除したあと、設定も削除するかどうかを確認します。"),
             ("p", "ポータブルで使う:wyrmhold.exe はほかに何も必要としない 1 つのファイルです。USB メモリーや共有フォルダーからインストールせずに使うには、wyrmhold.exe と一緒に空の wyrmhold.ini を置いてください。設定はそのファイルに保存されます。"),
             ("h", "3. ウィンドウ"),
@@ -138,6 +142,7 @@ GUIDES = {
             ("p", "ソースは C(Win32)です。C:\\msys64 に MSYS2 の mingw-w64 GCC があれば、build.bat が build\\wyrmhold.exe を作ります。tools\\make_installer.ps1 は Inno Setup 6 でセットアップを作ります。tools\\run_checks.ps1 と tools\\check_options.py はパスワードと正確なエントロピーを独立した計算と照合し、tools\\check_clipboard.ps1 はクリップボードを確認します。"),
             ("h", "13. ライセンスとクレジット"),
             ("p", "GNU 一般公衆利用許諾書 第 2 版(GPL-2.0-only)のもとで配布されるフリーソフトウェアです。使用・複製・研究・改変ができ、再配布する場合は同じライセンスでソースコードとともに行う必要があります。無保証です。全文は LICENSE.txt にあります。\u00A9 2026 Gabriel Castiglia."),
+            ("p", "ソースコード・リリース・更新: https://" + REPO),
             ("p", "パスフレーズの単語:Electronic Frontier Foundation の EFF large word list(CC BY 3.0 US、eff.org/dice)。アイコン:アタナシウス・キルヒャー『地下世界』(アムステルダム、1665 年)の翼のある竜(パブリックドメイン)。"),
         ],
     },
@@ -150,7 +155,7 @@ GUIDES = {
             ("p", "Wyrmhold genera contraseñas, frases y PIN fuertes y aleatorios en tu propia computadora: para un zip, 7z o rar que mandás por email, una cuenta nueva, una red Wi-Fi o una cerradura. No guarda ni envía nada: las contraseñas existen solo en la ventana hasta que las copiás o guardás."),
             ("p", "El nombre: \u00ABwyrm\u00BB es «dragón» en inglés antiguo y \u00ABhold\u00BB, «fortaleza». Un wyrmhold es el bastión donde un dragón custodia su tesoro \u2014 como este programa custodia tus contraseñas. El ícono lo muestra: el dragón alado de Athanasius Kircher (Mundus Subterraneus, 1665) vigilando su torre, con una cerradura encendida en la ventana."),
             ("h", "2. Instalar y desinstalar"),
-            ("p", "Windows 10 u 11 de 64 bits. Ejecutá Wyrmhold-Setup-" + VERSION + ".exe y elegí el idioma del instalador: inglés, japonés o español. Por defecto se instala solo para tu usuario, sin permisos de administrador; la primera página también ofrece instalarlo para todos los usuarios. Agrega Wyrmhold y la guía de uso al menú Inicio, y un acceso directo en el escritorio si lo marcás. El programa arranca en el idioma que elegiste para el instalador."),
+            ("p", "Windows 10 u 11 con un procesador Intel o AMD de 64 bits (x64); no hay versión para procesadores ARM. Ejecutá Wyrmhold-Setup-" + VERSION + ".exe y elegí el idioma del instalador: inglés, japonés o español. Por defecto se instala solo para tu usuario, sin permisos de administrador; la primera página también ofrece instalarlo para todos los usuarios. Agrega Wyrmhold y la guía de uso al menú Inicio, y un acceso directo en el escritorio si lo marcás. El programa arranca en el idioma que elegiste para el instalador."),
             ("p", "Para desinstalarlo: Configuración \u2192 Aplicaciones \u2192 Aplicaciones instaladas \u2192 Wyrmhold \u2192 Desinstalar. El desinstalador borra todos los archivos que instaló y después pregunta si querés borrar también tu configuración."),
             ("p", "Uso portable: wyrmhold.exe es un único archivo que no necesita nada más. Para usarlo desde un pendrive o una carpeta compartida sin instalarlo, copialo ahí junto con un archivo vacío llamado wyrmhold.ini: la configuración se guarda entonces en ese archivo."),
             ("h", "3. La ventana"),
@@ -193,6 +198,7 @@ GUIDES = {
             ("p", "El código es C (Win32). Con el GCC mingw-w64 de MSYS2 en C:\\msys64, build.bat genera build\\wyrmhold.exe; tools\\make_installer.ps1 arma el instalador con Inno Setup 6. tools\\run_checks.ps1 y tools\\check_options.py verifican las contraseñas y la entropía exacta contra cálculos independientes, y tools\\check_clipboard.ps1 el portapapeles."),
             ("h", "13. Licencia y créditos"),
             ("p", "Software libre bajo la Licencia Pública General de GNU, versión 2 (GPL-2.0-only): podés usarlo, copiarlo, estudiarlo y modificarlo, y quien lo redistribuya debe hacerlo bajo la misma licencia, con el código fuente. Se ofrece sin garantía. El texto completo está en LICENSE.txt. \u00A9 2026 Gabriel Castiglia."),
+            ("p", "Código fuente, versiones y actualizaciones: https://" + REPO),
             ("p", "Palabras de las frases: la lista grande de la EFF, de la Electronic Frontier Foundation, bajo CC BY 3.0 US (eff.org/dice). Ícono: el dragón alado de Athanasius Kircher, Mundus Subterraneus (Ámsterdam, 1665), de dominio público."),
         ],
     },

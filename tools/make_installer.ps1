@@ -1,13 +1,15 @@
 ﻿# Wyrmhold -- builds the setup (out\Wyrmhold-Setup-<version>.exe) with Inno Setup 6.
-# Author: Gabriel Castiglia - 2026-11-10
+# Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+# Date: November 10, 2026
+# SPDX-License-Identifier: GPL-2.0-only
 #
 # Run after build.bat and tools\make_pdf.ps1: the setup carries build\wyrmhold.exe and the
-# PDF guides. The version is read from src\wyrmhold.c, so the setup cannot name another one.
+# PDF guides. The version is read from src\version.h, so the setup cannot name another one.
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$src = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'src\wyrmhold.c')
-if ($src -notmatch '#define APP_VERSION\s+L"([\d.]+)"') { throw 'APP_VERSION not found' }
+$src = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'src\version.h')
+if ($src -notmatch '#define WH_VERSION_STR\s+"([\d.]+)"') { throw 'WH_VERSION_STR not found' }
 $version = $Matches[1]
 
 foreach ($f in @('build\wyrmhold.exe', 'docs\wyrmhold_guide_en.pdf', 'docs\wyrmhold_guide_jp.pdf', 'docs\wyrmhold_guide_es.pdf',

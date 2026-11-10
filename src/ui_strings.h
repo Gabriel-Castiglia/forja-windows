@@ -1,6 +1,8 @@
 /**
   Wyrmhold -- every piece of text the window shows.
-  Author: Gabriel Castiglia - 2026-11-09 (2.0.0: 2026-11-10)
+  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+  Date: November 9, 2026
+  SPDX-License-Identifier: GPL-2.0-only
 
   One table, three columns (English, Japanese, Spanish). Nothing user-visible is written
   anywhere else in the program. Each entry is a designated initialiser, so a column cannot
@@ -288,7 +290,7 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_ABOUT_TITLE]    = L"About",
 	[S_ABOUT_NAME]     = L"Wyrmhold",
 	[S_ABOUT_MEANING]  = L"\x201CWyrm\x201D is Old English for dragon and \x201Chold\x201D a stronghold: a wyrmhold is the dragon's keep, where a dragon guards its hoard \x2014 as this program guards your passwords.",
-	[S_ABOUT_VERSION]  = L"Version %ls  \x00B7  2026-11-10",
+	[S_ABOUT_VERSION]  = L"Version %ls  \x00B7  %ls",
 	[S_ABOUT_BODY]     = L"Makes strong random passwords, passphrases and PINs with the Windows "
 	                     L"cryptographic random number generator, uniformly over every password that "
 	                     L"follows the chosen rules. Nothing is stored or sent anywhere: the passwords "
@@ -525,7 +527,7 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_ABOUT_TITLE]    = L"バージョン情報",
 	[S_ABOUT_NAME]     = L"Wyrmhold",
 	[S_ABOUT_MEANING]  = L"\x300CWyrm\x300D は古英語で「竜」、\x300Chold\x300D は「砦」。Wyrmhold は竜が宝を守る砦のこと \x2014 このプログラムがあなたのパスワードを守るように。",
-	[S_ABOUT_VERSION]  = L"バージョン %ls  \x00B7  2026-11-10",
+	[S_ABOUT_VERSION]  = L"バージョン %ls  \x00B7  %ls",
 	[S_ABOUT_BODY]     = L"Windows の暗号用乱数生成器を使い、選んだ規則を満たすすべてのパスワードの中から"
 	                     L"均等に、強力なパスワード、パスフレーズ、PIN を作ります。何も保存されず、どこにも"
 	                     L"送信されません。パスワードは、コピーまたは保存するまでこのウィンドウの中にだけ存在します。",
@@ -764,7 +766,7 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_ABOUT_TITLE]    = L"Acerca de",
 	[S_ABOUT_NAME]     = L"Wyrmhold",
 	[S_ABOUT_MEANING]  = L"\x00ABWyrm\x00BB es «dragón» en inglés antiguo y \x00ABhold\x00BB, «fortaleza»: un wyrmhold es el bastión donde un dragón custodia su tesoro \x2014 como este programa custodia tus contraseñas.",
-	[S_ABOUT_VERSION]  = L"Versión %ls  \x00B7  2026-11-10",
+	[S_ABOUT_VERSION]  = L"Versión %ls  \x00B7  %ls",
 	[S_ABOUT_BODY]     = L"Genera contraseñas, frases y PIN fuertes con el generador criptográfico de números "
 	                     L"aleatorios de Windows, de manera uniforme entre todas las contraseñas que cumplen las "
 	                     L"reglas elegidas. No guarda ni envía nada: las contraseñas existen solo en esta ventana "
