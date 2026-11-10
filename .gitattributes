@@ -6,3 +6,6 @@
 *.ico binary
 *.docx binary
 *.pdf binary
+*.bmp binary
+*.jpg binary
+*.bin binary

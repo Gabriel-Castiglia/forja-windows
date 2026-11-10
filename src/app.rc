@@ -1,5 +1,5 @@
 /**
-  Random Password Generator -- resources.
+  Wyrmhold -- resources.
   Author: Gabriel Castiglia - 2026-11-09
 
   The icon (drawn by tools/make_icon.py), the keyboard accelerators, the version block,
@@ -10,6 +10,7 @@
 #include "resource.h"
 
 IDI_APP  ICON    "../assets/app.ico"
+IDR_ICONLAYER RCDATA "../assets/icon_layer.bin"
 
 /* 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID, 24 = RT_MANIFEST */
 1 24 "../assets/manifest.xml"
@@ -21,11 +22,14 @@ BEGIN
     "C",        IDM_COPYALL,    VIRTKEY, CONTROL, SHIFT
     "S",        IDM_SAVE,       VIRTKEY, CONTROL
     VK_F1,      IDM_HELP,       VIRTKEY
+    "1",        IDM_MODE_CHARS, VIRTKEY, CONTROL
+    "2",        IDM_MODE_WORDS, VIRTKEY, CONTROL
+    "3",        IDM_MODE_PIN,   VIRTKEY, CONTROL
 END
 
 1 VERSIONINFO
-FILEVERSION     1,0,1,0
-PRODUCTVERSION  1,0,1,0
+FILEVERSION     2,0,0,0
+PRODUCTVERSION  2,0,0,0
 FILEOS          0x40004
 FILETYPE        0x1
 BEGIN
@@ -34,12 +38,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName",      "Gabriel Castiglia"
-            VALUE "FileDescription",  "Random Password Generator"
-            VALUE "FileVersion",      "1.0.1"
-            VALUE "InternalName",     "randompassgen"
-            VALUE "OriginalFilename", "randompassgen.exe"
-            VALUE "ProductName",      "Random Password Generator"
-            VALUE "ProductVersion",   "1.0.1"
+            VALUE "FileDescription",  "Wyrmhold"
+            VALUE "FileVersion",      "2.0.0"
+            VALUE "InternalName",     "wyrmhold"
+            VALUE "OriginalFilename", "wyrmhold.exe"
+            VALUE "ProductName",      "Wyrmhold"
+            VALUE "ProductVersion",   "2.0.0"
             VALUE "LegalCopyright",   "(C) 2026 Gabriel Castiglia"
         END
     END

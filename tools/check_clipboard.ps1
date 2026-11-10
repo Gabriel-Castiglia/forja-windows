@@ -1,4 +1,4 @@
-# Random Password Generator -- clipboard behaviour, checked from outside the program.
+# Wyrmhold -- clipboard behaviour, checked from outside the program.
 # Author: Gabriel Castiglia - 2026-11-09
 #
 # Run it in an interactive desktop session with Windows PowerShell 5.1 (STA, needed to read
@@ -30,7 +30,7 @@ public static class W {
 }
 "@
 
-$exe = Join-Path (Split-Path -Parent $PSScriptRoot) 'build\randompassgen.exe'
+$exe = Join-Path (Split-Path -Parent $PSScriptRoot) 'build\wyrmhold.exe'
 $out = New-Object System.Collections.Generic.List[string]
 $fail = 0
 function Say($ok, $what) { if (-not $ok) { $script:fail++ }; $out.Add(('{0,-4} {1}' -f ($(if ($ok) {'ok'} else {'BAD'})), $what)) }

@@ -1,13 +1,13 @@
-# Random Password Generator -- the engine checks, run through the command line (/out).
+# Wyrmhold -- the engine checks, run through the command line (/out).
 # Author: Gabriel Castiglia - 2026-11-09
 #
-# First calibrates check_passwords.py: a file of correct passwords made by password_gen.py's
-# own rules must pass, and five copies of it, each spoiled in one way, must fail. Only then
+# First calibrates check_passwords.py: a file of correct passwords made here by the
+# same rules must pass, and five copies of it, each spoiled in one way, must fail. Only then
 # are the program's outputs checked. Output files go to a temporary folder.
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$exe  = Join-Path $root 'build\randompassgen.exe'
+$exe  = Join-Path $root 'build\wyrmhold.exe'
 $chk  = Join-Path $PSScriptRoot 'check_passwords.py'
 $tmp  = Join-Path ([IO.Path]::GetTempPath()) ('rpg_checks_' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $tmp | Out-Null
@@ -73,5 +73,10 @@ foreach ($case in @(
 }
 
 Remove-Item -Recurse -Force $tmp
+
+# the 2.0 options (character sets, exclusions, PINs, passphrases) and the exact entropy
+''
+& python -I (Join-Path $PSScriptRoot 'check_options.py') $exe
+if ($LASTEXITCODE) { $fail++ }
 ''
 if ($fail) { "FAILED: $fail check(s)"; exit 1 } else { 'ALL CHECKS PASSED'; exit 0 }

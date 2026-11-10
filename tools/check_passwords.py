@@ -1,6 +1,6 @@
 """
-Random Password Generator -- checks a file written with /out against the rules of
-password_gen.py, independently of the C code.
+Wyrmhold -- checks a file written with /out against the standard
+rules (the four classes, basic symbols), independently of the C code.
 Author: Gabriel Castiglia - 2026-11-09
 
     python tools/check_passwords.py <file> <length> <avoid 1|0> [expected count]

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.0.0 — 2026-11-10
+
+- New name: **Wyrmhold** — Old English *wyrm*, dragon, and *hold*, stronghold: the dragon's keep. New icon:
+  Athanasius Kircher's winged dragon (1665) guarding its tower, in engraving style.
+- Three kinds of password: characters, passphrases (EFF large word list, 3–12 words, six separators) and PINs
+  (no repeats, no runs).
+- Profiles: Standard, Maximum, No symbols, Minimal symbols, Short, Wi-Fi, Passphrase, PIN.
+- Character options: which kinds to use, symbol set (basic, all, minimal, your own), characters to leave out,
+  no repeats in a row, start with a letter.
+- Uniform generation over every password that follows the rules (rejection of the whole password), and the
+  exact entropy, counted with every rule included; strength in five steps with a guessing time.
+- New look: anti-aliased drawing, rounded fields and buttons, a band with the icon, owner-drawn menus.
+- View → Theme and colour: light, dark or as Windows, and twelve colours that also colour the icon; black by default.
+- Setup in English, Japanese and Spanish with an uninstaller; settings in `%APPDATA%\Wyrmhold`, or portable
+  with a `wyrmhold.ini` beside the program.
+- Command line: `/mode`, `/words`, `/classes`, `/symbols`, `/exclude`, `/norepeat`, `/startletter`, `/sep`,
+  `/nocap`, `/nonumber`, `/allowruns`, `/preset`, `/entropy`, `/accent`, `/open`.
+- User guides rewritten; new check `tools/check_options.py`.
+
 ## 1.0.1 — 2026-11-10
 
 - The About window shows the license (GPL-2.0-only, no warranty) in English, Japanese and Spanish.

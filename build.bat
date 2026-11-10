@@ -1,5 +1,5 @@
 @echo off
-rem  Random Password Generator -- builds build\randompassgen.exe from src\.
+rem  Wyrmhold -- builds build\wyrmhold.exe from src\.
 rem  Author: Gabriel Castiglia - 2026-11-09
 rem
 rem  Needs mingw-w64 GCC on the PATH (MSYS2 mingw64) and nothing else. The executable is
@@ -18,12 +18,12 @@ if errorlevel 1 goto :failed
 
 echo [2/2] program
 gcc -O2 -Wall -Wextra -mwindows -static -DUNICODE -D_UNICODE -Isrc ^
-    -o build\randompassgen.exe src\randompassgen.c src\pwgen.c build\app.res ^
-    -lcomctl32 -lcomdlg32 -lgdi32 -luxtheme -ldwmapi -lbcrypt -lshell32
+    -o build\wyrmhold.exe src\wyrmhold.c src\pwgen.c build\app.res ^
+    -lcomctl32 -lcomdlg32 -lgdi32 -luxtheme -ldwmapi -lbcrypt -lshell32 -lgdiplus -lm
 if errorlevel 1 goto :failed
 
 echo.
-echo Built: build\randompassgen.exe
+echo Built: build\wyrmhold.exe
 goto :eof
 
 :failed
