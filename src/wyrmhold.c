@@ -2118,6 +2118,7 @@ static void buildControls(void)
 	int i;
 
 	ZeroMemory(&wc, sizeof(wc));
+	wc.style = CS_HREDRAW | CS_VREDRAW;          /* the track is drawn across the whole width */
 	wc.lpfnWndProc = sliderProc;
 	wc.hInstance = gInst;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -2239,7 +2240,7 @@ static void placeField(HWND e, int x, int y, int w, int show)
 	}
 }
 
-static int toggleWidth(int str) { return SC(34 + 10 + 4) + textWidth(fUi, T(str), headLen(T(str))); }
+static int toggleWidth(int str) { return SC(34 + 10 + 10) + textWidth(fUi, T(str), headLen(T(str))); }
 
 static void layout(void)
 {
@@ -2401,7 +2402,10 @@ static void layout(void)
 	SetRect(&gVersionR, W - m - SC(80), H - SC(STATUS_H), W - m, H);
 
 	if (hTip) setStrengthTip(TTM_NEWTOOLRECTW);
-	InvalidateRect(hMain, NULL, FALSE);
+	/* Every child was moved or resized: repaint all of them whole. Moving a child only
+	 * repaints the part that comes into view, so the owner-drawn controls (slider track,
+	 * stepper, list rows with their copy icons at the right edge) would keep stale pixels. */
+	RedrawWindow(hMain, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 }
 
 /* ------------------------------------------------------------------ painting */
@@ -3700,6 +3704,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	makeIcons();
 
 	ZeroMemory(&wc, sizeof(wc));
+	wc.style = CS_HREDRAW | CS_VREDRAW;
 	wc.lpfnWndProc = wndProc;
 	wc.hInstance = inst;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
