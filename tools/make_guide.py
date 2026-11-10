@@ -68,6 +68,8 @@ GUIDES = {
             ("p", "/out writes the passwords to the file, one per line, and exits (up to 100000 at a time). /ambiguous allows 0 O 1 l I. Other switches: /lang:en|jp|es and /theme:light|dark choose the language and theme for that run; /shot:file.bmp saves a picture of the window and exits. None of them changes the settings file."),
             ("h", "9. Building from source"),
             ("p", "The Source folder holds the code (C, Win32) and build.bat. With MSYS2 mingw-w64 GCC installed in C:\\msys64, run build.bat; the program is written to build\\randompassgen.exe. tools\\run_checks.ps1 checks the generator against the rules with several hundred thousand passwords, and tools\\check_clipboard.ps1 checks the clipboard behaviour."),
+            ("h", "10. License"),
+            ("p", "Free software under the GNU General Public License, version 2 (GPL-2.0-only): you may use, copy, study and change it, and anyone who passes it on must do so under the same license, with the source code. It comes with no warranty. The full text is in LICENSE.txt, next to the program. \u00A9 2026 Gabriel Castiglia."),
         ],
     },
     "jp": {
@@ -107,6 +109,8 @@ GUIDES = {
             ("p", "/out はパスワードを 1 行ずつファイルに書き込んで終了します（1 回に最大 100000 個）。/ambiguous は 0 O 1 l I を許可します。その他: /lang:en|jp|es と /theme:light|dark はその回の言語とテーマを指定し、/shot:file.bmp はウィンドウの画像を保存して終了します。いずれも設定ファイルは変更しません。"),
             ("h", "9. ソースからのビルド"),
             ("p", "Source フォルダーにコード（C、Win32）と build.bat があります。MSYS2 の mingw-w64 GCC を C:\\msys64 にインストールした状態で build.bat を実行すると、build\\randompassgen.exe が生成されます。tools\\run_checks.ps1 は数十万個のパスワードで生成ルールを検証し、tools\\check_clipboard.ps1 はクリップボードの動作を検証します。"),
+            ("h", "10. ライセンス"),
+            ("p", "GNU 一般公衆利用許諾書 バージョン 2 (GPL-2.0-only) に基づくフリーソフトウェアです。使用・複製・研究・改変ができ、再配布する場合は同じライセンスでソースコードとともに配布する必要があります。無保証です。全文はプログラムと同じフォルダーの LICENSE.txt にあります。\u00A9 2026 Gabriel Castiglia"),
         ],
     },
     "es": {
@@ -146,6 +150,8 @@ GUIDES = {
             ("p", "/out escribe las contrase\u00f1as en el archivo, una por l\u00ednea, y termina (hasta 100000 por vez). /ambiguous permite 0 O 1 l I. Otros modificadores: /lang:en|jp|es y /theme:light|dark eligen el idioma y el tema para esa corrida; /shot:archivo.bmp guarda una imagen de la ventana y termina. Ninguno cambia el archivo de configuraci\u00f3n."),
             ("h", "9. Compilar desde el c\u00f3digo"),
             ("p", "La carpeta Source tiene el c\u00f3digo (C, Win32) y build.bat. Con el GCC mingw-w64 de MSYS2 instalado en C:\\msys64, se ejecuta build.bat y el programa queda en build\\randompassgen.exe. tools\\run_checks.ps1 verifica el generador contra las reglas con varios cientos de miles de contrase\u00f1as, y tools\\check_clipboard.ps1 verifica el comportamiento del portapapeles."),
+            ("h", "10. Licencia"),
+            ("p", "Software libre bajo la Licencia P\u00fablica General GNU, versi\u00f3n 2 (GPL-2.0-only): se puede usar, copiar, estudiar y modificar, y quien lo redistribuya debe hacerlo con la misma licencia y con el c\u00f3digo. Se entrega sin ninguna garant\u00eda. El texto completo est\u00e1 en LICENSE.txt, junto al programa. \u00A9 2026 Gabriel Castiglia."),
         ],
     },
 }

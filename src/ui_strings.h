@@ -30,7 +30,7 @@ enum {
 	S_MENU_HELP, S_MENU_HELPTOPICS, S_MENU_ABOUT,
 	S_HELP_TITLE, S_HELP_BODY, S_BTN_OK,
 	S_ABOUT_TITLE, S_ABOUT_NAME, S_ABOUT_VERSION, S_ABOUT_CREATED, S_ABOUT_BODY,
-	S_ABOUT_AUTHOR,
+	S_ABOUT_AUTHOR, S_ABOUT_LICENSE,
 	S_COUNT
 };
 
@@ -145,6 +145,8 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                   L"sent anywhere: the passwords exist only in this window until you copy "
 	                   L"or save them.",
 	[S_ABOUT_AUTHOR] = L"Author: %ls",
+	[S_ABOUT_LICENSE]= L"Free software under the GNU General Public License, version 2 (GPL-2.0-only). "
+	                   L"It comes with no warranty. \x00A9 2026 Gabriel Castiglia.",
 },
 
 /* ------------------------------------------------------------------ Japanese */
@@ -234,6 +236,8 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                   L"各パスワードには小文字・大文字・数字・記号がそれぞれ 1 文字以上含まれます。"
 	                   L"パスワードは保存も送信もされず、コピーまたは保存するまでこのウィンドウの中にしか存在しません。",
 	[S_ABOUT_AUTHOR] = L"作成者: %ls",
+	[S_ABOUT_LICENSE]= L"GNU 一般公衆利用許諾書 バージョン 2 (GPL-2.0-only) に基づくフリーソフトウェアです。"
+	                   L"無保証です。\x00A9 2026 Gabriel Castiglia",
 },
 
 /* ------------------------------------------------------------------ Spanish */
@@ -347,6 +351,8 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                   L"las contrase\x00F1" L"as existen s\x00F3" L"lo en esta ventana hasta que las copi\x00E1" L"s o "
 	                   L"las guard\x00E1" L"s.",
 	[S_ABOUT_AUTHOR] = L"Autor: %ls",
+	[S_ABOUT_LICENSE]= L"Software libre bajo la Licencia P\x00FA" L"blica General GNU, versi\x00F3" L"n 2 (GPL-2.0-only). "
+	                   L"Se entrega sin ninguna garant\x00ED" L"a. \x00A9 2026 Gabriel Castiglia.",
 },
 };
 

@@ -54,7 +54,7 @@
 #include "resource.h"
 #include "ui_strings.h"
 
-#define APP_VERSION   L"1.0.0"
+#define APP_VERSION   L"1.0.1"
 #define APP_AUTHOR    L"Gabriel Castiglia"
 #define APP_AUMID     L"Castiglia.RandomPassGen"
 #define INI_SECTION   L"settings"
@@ -1513,23 +1513,34 @@ static void showHelp(HWND owner)
 
 /* ------------------------------------------------------------------ about window */
 
-/* Icon, name, version (from APP_VERSION), date, author, and what the program does.
+/* Icon, name, version (from APP_VERSION), date, author, what the program does and its licence.
  * The height is measured from the text, so it fits in all three languages. */
 
 #define AB_M     24
 #define AB_ICON  72
 #define AB_TEXT  138
 
+#define AB_GAP   14
+
+/* Height of one block of wrapped text in the interface font. */
+static int textHeight(HDC dc, const wchar_t *s, int width)
+{
+	RECT r = { 0, 0, width, 0 };
+
+	DrawTextW(dc, s, -1, &r, DT_WORDBREAK | DT_NOPREFIX | DT_CALCRECT);
+	return r.bottom - r.top;
+}
+
+/* Description, a gap, then the licence line. */
 static int aboutBodyHeight(int width)
 {
 	HDC dc = GetDC(NULL);
 	HGDIOBJ old = SelectObject(dc, fUi);
-	RECT r = { 0, 0, width, 0 };
+	int h = textHeight(dc, T(S_ABOUT_BODY), width) + SC(AB_GAP) + textHeight(dc, T(S_ABOUT_LICENSE), width);
 
-	DrawTextW(dc, T(S_ABOUT_BODY), -1, &r, DT_WORDBREAK | DT_NOPREFIX | DT_CALCRECT);
 	SelectObject(dc, old);
 	ReleaseDC(NULL, dc);
-	return r.bottom - r.top;
+	return h;
 }
 
 static LRESULT CALLBACK aboutProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -1570,6 +1581,10 @@ static LRESULT CALLBACK aboutProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		SetTextColor(dc, PAL.text);
 		SetRect(&t, SC(AB_M), SC(AB_TEXT), rc.right - SC(AB_M), rc.bottom);
 		DrawTextW(dc, T(S_ABOUT_BODY), -1, &t, DT_WORDBREAK | DT_NOPREFIX);
+
+		SetTextColor(dc, PAL.hint);
+		t.top += textHeight(dc, T(S_ABOUT_BODY), t.right - t.left) + SC(AB_GAP);
+		DrawTextW(dc, T(S_ABOUT_LICENSE), -1, &t, DT_WORDBREAK | DT_NOPREFIX);
 
 		SelectObject(dc, of);
 		EndPaint(hwnd, &ps);
