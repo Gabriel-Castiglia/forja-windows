@@ -295,7 +295,8 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"exist only in this window until you copy or save them.",
 	[S_ABOUT_AUTHOR]   = L"Author: %ls",
 	[S_ABOUT_CREDITS]  = L"Passphrase words: the EFF large word list, by the Electronic Frontier "
-	                     L"Foundation, under CC BY 3.0 US (eff.org/dice).",
+	                     L"Foundation, under CC BY 3.0 US (eff.org/dice). Icon: the winged dragon of Athanasius Kircher, "
+	                     L"Mundus Subterraneus (1665), public domain.",
 	[S_ABOUT_LICENSE]  = L"Free software under the GNU General Public License, version 2 (GPL-2.0-only). "
 	                     L"It comes with no warranty. \x00A9 2026 Gabriel Castiglia.",
 },
@@ -530,7 +531,8 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"送信されません。パスワードは、コピーまたは保存するまでこのウィンドウの中にだけ存在します。",
 	[S_ABOUT_AUTHOR]   = L"作成者: %ls",
 	[S_ABOUT_CREDITS]  = L"パスフレーズの単語: Electronic Frontier Foundation の EFF large word list"
-	                     L"(CC BY 3.0 US、eff.org/dice)。",
+	                     L"(CC BY 3.0 US、eff.org/dice)。アイコン: アタナシウス・キルヒャー『地下世界』(1665 年)の"
+	                     L"翼のある竜(パブリックドメイン)。",
 	[S_ABOUT_LICENSE]  = L"GNU 一般公衆利用許諾書 第2版 (GPL-2.0-only) のもとで配布されるフリーソフトウェアです。"
 	                     L"無保証です。\x00A9 2026 Gabriel Castiglia",
 },
@@ -769,7 +771,8 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"hasta que las copiás o guardás.",
 	[S_ABOUT_AUTHOR]   = L"Autor: %ls",
 	[S_ABOUT_CREDITS]  = L"Palabras de las frases: la lista grande de EFF, de la Electronic Frontier Foundation, "
-	                     L"bajo CC BY 3.0 US (eff.org/dice).",
+	                     L"bajo CC BY 3.0 US (eff.org/dice). Ícono: el dragón alado de Athanasius Kircher, "
+	                     L"Mundus Subterraneus (1665), de dominio público.",
 	[S_ABOUT_LICENSE]  = L"Software libre bajo la Licencia Pública General de GNU, versión 2 (GPL-2.0-only). "
 	                     L"Se ofrece sin garantía. \x00A9 2026 Gabriel Castiglia.",
 },

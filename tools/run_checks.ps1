@@ -74,7 +74,7 @@ foreach ($case in @(
 
 Remove-Item -Recurse -Force $tmp
 
-# the 2.0 options (character sets, exclusions, PINs, passphrases) and the exact entropy
+# every other option (character sets, exclusions, PINs, passphrases) and the exact entropy
 ''
 & python -I (Join-Path $PSScriptRoot 'check_options.py') $exe
 if ($LASTEXITCODE) { $fail++ }

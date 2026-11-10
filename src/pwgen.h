@@ -23,11 +23,12 @@
     is drawn at once and thrown away when it breaks a rule (a required class missing, a
     repeated neighbour, a run...), then drawn again. That makes the result uniform over
     *every* password that obeys the rules -- no position, class or pattern is more likely
-    than another -- which the older "one of each class, then shuffle" method only
-    approximated. pw_entropy() counts those passwords exactly (by dynamic programming over
+    than another -- which a "one of each class, then shuffle" method would only
+    approximate. pw_entropy() counts those passwords exactly (by dynamic programming over
     the positions), so the strength shown is the real one, not length * log2(pool).
 
-  The defaults (pw_defaults) are the standard profile: 20 characters, the four classes, the symbols !@#$%&*+-=?, no 0 O 1 l I.
+  The defaults (pw_defaults) are the standard profile: 20 characters, the four classes,
+  the symbols !@#$%&*+-=?, no 0 O 1 l I.
 **/
 
 #ifndef PWGEN_H

@@ -1,6 +1,6 @@
 """
-Wyrmhold -- checks the 2.0 options through the command line, independently
-of the C code.
+Wyrmhold -- checks the generator options through the command line,
+independently of the C code.
 Author: Gabriel Castiglia - 2026-11-10
 
     python tools/check_options.py <wyrmhold.exe>

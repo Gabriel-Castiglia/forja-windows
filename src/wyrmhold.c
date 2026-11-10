@@ -19,14 +19,14 @@
       the user's own symbols; passphrase: words, separator, capitals, a digit; PIN: digits,
       no repeats, no runs;
     - a strength line with the exact entropy, a level and how long guessing would take;
-    - a list of passwords drawn by us: digits blue, symbols amber, a copy icon on every row
+    - an owner-drawn list of passwords: digits blue, symbols amber, a copy icon on every row
       that turns into a check mark once the row has been copied;
     - copy one (icon, double-click, Enter, Ctrl+C), copy all (Ctrl+Shift+C), save (Ctrl+S);
     - copies are kept out of the clipboard history and the cloud clipboard, and are wiped
       30 s later (or on exit) unless something else has been copied since;
     - light, dark or follow-Windows theme and twelve accent colours (View -> Theme and
       colour), which also tint the icon;
-      English, Japanese and Spanish; Help and About windows.
+    - English, Japanese and Spanish; Help, About and Theme windows.
 
   How it is drawn: the page, the cards, the labels, the field frames and the strength line
   are painted by the main window into a back buffer; the interactive parts are owner-drawn
@@ -39,7 +39,7 @@
     - icons are loaded without LR_SHARED, which ignores the size asked for;
     - an owner-drawn button turns a quick second click into BN_DOUBLECLICKED, so double
       clicks are fed back as single ones;
-    - Esc closes Help and About, and the accelerators are quiet while About is modal;
+    - Esc closes Help, About and Theme, and the accelerators are quiet while a modal one is up;
     - a window cannot be driven from another process reliably (UIPI filters WM_GETTEXT),
       so the command line does everything a test needs:
 
@@ -142,9 +142,8 @@ typedef struct {
 	         band, band2, bandText, bandSub, menuBg;
 } Palette;
 
-/* Accent colours, twelve strong colours: a deeper tone for the
- * light theme, a brighter one for the dark, and the colour of the icon's tile. The first one,
- * black, is the default. */
+/* Twelve accent colours: a deeper tone for the light theme, a brighter one for the dark,
+ * and the colour of the icon's tile. The first one, black, is the default. */
 typedef struct { int name; COLORREF light, dark, tile; } Accent;
 
 static const Accent ACCENTS[] = {
@@ -509,7 +508,7 @@ static int systemPrefersDark(void)
 
 /* Windows has no documented way to ask for dark scroll bars and edit menus. These uxtheme
  * ordinals are what applications use; they are looked up at run time and skipped when
- * absent. Everything that matters is drawn by us anyway. */
+ * absent. Everything that matters is owner-drawn anyway. */
 static void enableDarkControls(int dark)
 {
 	typedef int  (WINAPI *PSetPreferredAppMode)(int);
@@ -2672,8 +2671,8 @@ static void showHelp(HWND owner)
 
 /* ------------------------------------------------------------------ about window */
 
-/* Icon, name, version (from APP_VERSION), date, author, what the program does, the word
- * list credit and the licence. The height is measured from the text, so it fits in all
+/* Icon, name, version (from APP_VERSION), date, author, what the name means, what the
+ * program does, the credits and the licence. The height is measured from the text, so it fits in all
  * three languages. */
 
 #define AB_W     540
@@ -3767,8 +3766,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 
 	while (GetMessageW(&msg, NULL, 0, 0) > 0)
 	{
-		/* while About is up the main window is disabled, so its accelerators are not what
-		 * the user is aiming at. Help and About get IsDialogMessage for Tab and Esc. */
+		/* while About or Theme is up the main window is disabled, so its accelerators are not
+		 * what the user is aiming at. Help, About and Theme get IsDialogMessage for Tab and Esc. */
 		if (!hAboutWnd && !hThemeWnd && (msg.hwnd == hMain || IsChild(hMain, msg.hwnd)) &&
 		    TranslateAcceleratorW(hMain, accel, &msg)) continue;
 		if (hAboutWnd && IsDialogMessageW(hAboutWnd, &msg)) continue;
