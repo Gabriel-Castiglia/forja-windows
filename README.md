@@ -34,6 +34,9 @@ dragon guards its hoard — as this program guards your passwords.
 - Command line for scripts: `wyrmhold.exe /out:passwords.txt [/mode:chars|words|pin] [/len:N] [/count:N] ...`
 
 **Download:** the setup is in [Releases](https://github.com/Gabriel-Castiglia/wyrmhold-windows/releases/latest).
+
+**macOS version:** <https://github.com/Gabriel-Castiglia/wyrmhold> (Apple silicon only).
+
 **User guides:** [`docs/`](docs) — English, Japanese and Spanish, in PDF and Word.
 
 ### Build
@@ -88,6 +91,9 @@ su tesoro — como este programa custodia tus contraseñas.
 - Línea de comandos para scripts: `wyrmhold.exe /out:claves.txt [/mode:chars|words|pin] [/len:N] [/count:N] ...`
 
 **Descarga:** el instalador está en [Releases](https://github.com/Gabriel-Castiglia/wyrmhold-windows/releases/latest).
+
+**Versión para macOS:** <https://github.com/Gabriel-Castiglia/wyrmhold> (solo Apple silicon).
+
 **Guías de uso:** [`docs/`](docs) — en inglés, japonés y español, en PDF y Word.
 
 ### Compilar
@@ -122,6 +128,10 @@ Las verificaciones están en la tabla de la versión en inglés.
 - 英語・日本語・スペイン語。ライト・ダーク・Windows に合わせるテーマと 12 色(アイコンの色も変わります)。
 - 3 か国語の**セットアップ**(ユーザー単位、管理者権限不要、きれいに削除できるアンインストーラー)。またはポータブル:
   静的リンクの `wyrmhold.exe` と空の `wyrmhold.ini`。
+
+**ダウンロード:** セットアップは [Releases](https://github.com/Gabriel-Castiglia/wyrmhold-windows/releases/latest) にあります。
+
+**macOS 版:** <https://github.com/Gabriel-Castiglia/wyrmhold>(Apple silicon のみ)。
 
 **ユーザーガイド:** [`docs/`](docs) — 英語・日本語・スペイン語(PDF と Word)。
 
