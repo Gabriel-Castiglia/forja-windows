@@ -86,7 +86,7 @@ rem -> out\Wyrmhold-Setup-<version>.exe
 
 The version is written only in `src/version.h`; the program, the setup and the guides read it from there.
 
-Tested with: Windows 11 Pro x64, MSYS2 2026-09-27 with mingw-w64 GCC 16.2.0 and binutils (windres) 2.47,
+Tested with: Windows 11 Pro x64, MSYS2 with mingw-w64 GCC 16.2.0 (package 16.2.0-6) and binutils (windres) 2.47 (2.47-4),
 Inno Setup 6.7.3, Python 3.13.17 with python-docx 1.2.0 (guides), Pillow 12.3.0, numpy 2.5.4, scipy 1.18.1 and
 opencv-python 5.0.0.93 (icon and setup pictures), LibreOffice 26.8.2.2 (guides to PDF).
 

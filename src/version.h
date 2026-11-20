@@ -16,8 +16,8 @@
 
 #define WH_VER_MAJOR    2
 #define WH_VER_MINOR    1
-#define WH_VER_PATCH    0
-#define WH_VERSION_STR  "2.1.0"
+#define WH_VER_PATCH    1
+#define WH_VERSION_STR  "2.1.1"
 #define WH_DATE_STR     "2026-11-20"
 #define WH_REPO_STR     "github.com/Gabriel-Castiglia/wyrmhold-windows"
 

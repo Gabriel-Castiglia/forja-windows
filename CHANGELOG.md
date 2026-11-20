@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 — 2026-11-20
+
+- The same program as 2.1.0, built again with the GCC of MSYS2, as every version before 2.1.0 and as this README
+  says; 2.1.0 had been built with the GCC of WinLibs. Same GCC (16.2.0) and linker (2.47), same libraries and the
+  same results; the program no longer carries a threads library it does not use, and it is 21.8 KB smaller.
+
 ## 2.1.0 — 2026-11-20
 
 - Clipboard: copies are now wiped after **2 minutes** by default (it was a fixed 30 seconds). A drop-down next to
