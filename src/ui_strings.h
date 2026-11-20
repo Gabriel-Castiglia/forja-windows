@@ -13,7 +13,8 @@
     - a %d or %ls in one language is in the same order in the others;
     - menu-style texts may carry a hint after a tab ("Basic\t! @ #"): the hint is shown
       right-aligned in menus, and buttons show only the part before the tab;
-    - groups used by position (S_MODE_*, S_CHIP_*, S_SYM_*, S_SEP_*) stay consecutive;
+    - groups used by position (S_MODE_*, S_CHIP_*, S_SYM_*, S_SEP_*, S_CLR_10S..S_CLR_10M)
+      stay consecutive;
     - the help text: "# " starts a heading, "\x2022 " a bullet, an empty line a paragraph.
 **/
 
@@ -38,6 +39,7 @@ enum {
 	S_OPT_AMBIG, S_OPT_NOREPEAT, S_OPT_START, S_OPT_CAP, S_OPT_NUMBER, S_OPT_NOSEQ, S_OPT_CLEAR,
 	S_TIP_AMBIG, S_TIP_NOREPEAT, S_TIP_START, S_TIP_EXCLUDE, S_TIP_CUSTOM,
 	S_TIP_CAP, S_TIP_NUMBER, S_TIP_NOSEQ, S_TIP_CLEAR,
+	S_CLR_10S, S_CLR_30S, S_CLR_1M, S_CLR_2M, S_CLR_5M, S_CLR_10M, S_CLR_FMT_S, S_CLR_FMT_M, S_TIP_CLEARTIME,
 	S_WORDS_NOTE, S_PIN_NOTE,
 	S_GENERATE, S_TIP_GENERATE, S_TIP_COPYALL, S_TIP_SAVE,
 	S_STR_VWEAK, S_STR_WEAK, S_STR_FAIR, S_STR_STRONG, S_STR_VSTRONG, S_STR_PIN,
@@ -56,7 +58,10 @@ enum {
 	S_ACCENT_BLUE, S_ACCENT_GOLD, S_ACCENT_PURPLE, S_ACCENT_SKY, S_ACCENT_EMBER, S_ACCENT_RED,
 	S_ACCENT_YELLOW, S_ACCENT_GREEN, S_ACCENT_TEAL, S_ACCENT_PINK, S_ACCENT_BLACK, S_ACCENT_WHITE,
 	S_MENU_LANG, S_MENU_EN, S_MENU_JP, S_MENU_ES,
-	S_MENU_HELP, S_MENU_HELPTOPICS, S_MENU_ABOUT,
+	S_MENU_HELP, S_MENU_HELPTOPICS, S_MENU_ABOUT, S_MENU_UPDATE, S_MENU_UPDATE_AUTO,
+	S_UPD_UPTODATE, S_UPD_AVAILABLE, S_UPD_PORTABLE, S_UPD_ERROR, S_UPD_ASK_HEAD, S_UPD_ASK,
+	S_UPD_NOW, S_UPD_NOTES, S_UPD_LATER, S_UPD_CHECKING, S_UPD_DOWNLOADING, S_UPD_NOHASH, S_UPD_BADHASH,
+	S_UPD_FAILED, S_UPD_UPDATED, S_UPD_NET, S_UPD_BADREPLY,
 	S_HELP_TITLE, S_HELP_BODY, S_BTN_OK,
 	S_ABOUT_TITLE, S_ABOUT_NAME, S_ABOUT_MEANING, S_ABOUT_VERSION, S_ABOUT_BODY, S_ABOUT_AUTHOR, S_ABOUT_CREDITS, S_ABOUT_LICENSE,
 	S_COUNT
@@ -124,7 +129,7 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_OPT_CAP]        = L"Capital letters",
 	[S_OPT_NUMBER]     = L"Add a digit",
 	[S_OPT_NOSEQ]      = L"No runs like 123 or 987",
-	[S_OPT_CLEAR]      = L"Clear clipboard after 30 s",
+	[S_OPT_CLEAR]      = L"Clear clipboard after",
 	[S_TIP_AMBIG]      = L"Leaves out 0, O, 1, l and I (and | ` ' \" among the symbols).\n"
 	                     L"They look alike in many fonts, so a password that is\n"
 	                     L"read out or typed by hand goes wrong less often.",
@@ -142,10 +147,23 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"require a number.",
 	[S_TIP_NOSEQ]      = L"No three digits in a row going up or down by one,\n"
 	                     L"such as 123 or 987: the first ones people try.",
-	[S_TIP_CLEAR]      = L"30 seconds after you copy a password it is wiped\n"
-	                     L"from the clipboard, unless you have copied something\n"
-	                     L"else in between. Copies never go to the clipboard\n"
+	[S_TIP_CLEAR]      = L"A copied password is wiped from the clipboard once the\n"
+	                     L"time chosen on the right is up (2 minutes unless you\n"
+	                     L"change it), or when Wyrmhold is closed \x2014 but only if\n"
+	                     L"the clipboard still holds exactly what Wyrmhold put\n"
+	                     L"there. Switched off, copies stay until you copy\n"
+	                     L"something else. Copies never go to the clipboard\n"
 	                     L"history (Win+V) or to the cloud clipboard.",
+	[S_CLR_10S]        = L"10 s",
+	[S_CLR_30S]        = L"30 s",
+	[S_CLR_1M]         = L"1 min",
+	[S_CLR_2M]         = L"2 min\tdefault",
+	[S_CLR_5M]         = L"5 min",
+	[S_CLR_10M]        = L"10 min",
+	[S_CLR_FMT_S]      = L"%d s",
+	[S_CLR_FMT_M]      = L"%d min",
+	[S_TIP_CLEARTIME]  = L"How long a copied password stays on the clipboard.\n"
+	                     L"Choosing a time also switches clearing on.",
 	[S_WORDS_NOTE]     = L"Words from the EFF list of 7776 English words: each adds 12.9 bits.",
 	[S_PIN_NOTE]       = L"A PIN is only safe where wrong tries are limited (cards, phones, locks).",
 	[S_GENERATE]       = L"Generate",
@@ -236,6 +254,28 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_MENU_HELP]      = L"&Help",
 	[S_MENU_HELPTOPICS]= L"&Help\tF1",
 	[S_MENU_ABOUT]     = L"&About",
+	[S_MENU_UPDATE]    = L"Check for &updates\x2026",
+	[S_MENU_UPDATE_AUTO] = L"Check for updates &daily",
+	[S_UPD_UPTODATE]   = L"Wyrmhold %ls is up to date.",
+	[S_UPD_AVAILABLE]  = L"Wyrmhold %ls is available (you have %ls).\nOpen the download page?",
+	[S_UPD_PORTABLE]   = L"Wyrmhold %ls is available (you have %ls).\n\nThis copy is portable (it was not "
+	                     L"installed with the setup), so it cannot update itself. Open the download page?",
+	[S_UPD_ERROR]      = L"Could not check for updates.\n%ls",
+	[S_UPD_ASK_HEAD]   = L"Wyrmhold %ls is available",
+	[S_UPD_ASK]        = L"You have %ls. The update downloads and installs by itself: the setup is checked "
+	                     L"against the release's SHA-256 checksums, Wyrmhold closes, the new version installs "
+	                     L"with the same options and Wyrmhold opens again.",
+	[S_UPD_NOW]        = L"Update now",
+	[S_UPD_NOTES]      = L"What's new",
+	[S_UPD_LATER]      = L"Later",
+	[S_UPD_CHECKING]   = L"Checking for updates\x2026",
+	[S_UPD_DOWNLOADING]= L"Downloading Wyrmhold %ls\x2026 %ls",
+	[S_UPD_NOHASH]     = L"The release has no checksum for the setup.",
+	[S_UPD_BADHASH]    = L"The downloaded setup does not match its checksum; it was deleted.",
+	[S_UPD_FAILED]     = L"The update could not be installed.\n%ls",
+	[S_UPD_UPDATED]    = L"Wyrmhold was updated to %ls.",
+	[S_UPD_NET]        = L"The connection to GitHub failed (error %lu).",
+	[S_UPD_BADREPLY]   = L"GitHub's answer could not be read.",
 	[S_HELP_TITLE]     = L"Wyrmhold \x2014 Help",
 	[S_HELP_BODY]      =
 		L"# What it does\n"
@@ -277,9 +317,20 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"What is copied is plain text. View → Theme and colour… chooses the theme (light, dark or as "
 		L"Windows) and one of twelve colours, which also colour the icon; black is the default.\n"
 		L"# Clipboard\n"
-		L"With \"Clear clipboard after 30 s\" on, a copied password is wiped 30 seconds later, or when the "
-		L"program is closed, unless something else was copied in between. Copies are always kept out of "
-		L"the Windows clipboard history (Win+V) and the cloud clipboard.\n"
+		L"With \"Clear clipboard after\" on (the default), a copied password is wiped when the time chosen "
+		L"next to it is up \x2014 2 minutes, unless you pick 10 s, 30 s, 1, 5 or 10 minutes \x2014 or as soon "
+		L"as the program is closed, whichever comes first. It is wiped only if the clipboard still holds "
+		L"exactly what Wyrmhold put there: whatever you copied afterwards is left alone. Switched off, "
+		L"copies stay until you copy something else. Copies are always kept out of the Windows clipboard "
+		L"history (Win+V) and the cloud clipboard.\n"
+		L"# Updates\n"
+		L"Help \x2192 Check for updates\x2026 asks GitHub whether a newer version has been published; with "
+		L"\"Check for updates daily\" on (the default) this also happens by itself once a day. Nothing about "
+		L"you or your passwords is sent. When there is one, a single question: Update now, What's new or "
+		L"Later. Update now downloads the setup, checks it against the release's SHA-256 checksums (a file "
+		L"that does not match is deleted and never run), closes Wyrmhold, installs in silence with the same "
+		L"options and opens Wyrmhold again. A portable copy cannot update itself: it offers the download "
+		L"page instead.\n"
 		L"# Settings\n"
 		L"They are kept in %APPDATA%\\Wyrmhold\\wyrmhold.ini. To use the program portable, from a "
 		L"USB stick or a share, put an empty wyrmhold.ini next to wyrmhold.exe: then that one is used.\n"
@@ -363,7 +414,7 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_OPT_CAP]        = L"大文字にする",
 	[S_OPT_NUMBER]     = L"数字を1つ入れる",
 	[S_OPT_NOSEQ]      = L"123 や 987 のような連番なし",
-	[S_OPT_CLEAR]      = L"30秒後にクリップボードを消去",
+	[S_OPT_CLEAR]      = L"クリップボードを自動消去",
 	[S_TIP_AMBIG]      = L"0、O、1、l、I(記号では | ` ' \")を使いません。\n"
 	                     L"多くのフォントで見分けにくいため、読み上げたり\n"
 	                     L"手で入力したりするときの間違いが減ります。",
@@ -381,10 +432,23 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"数字を必須とするサイト用です。",
 	[S_TIP_NOSEQ]      = L"123 や 987 のように1ずつ増減する3桁の並びを使いません。\n"
 	                     L"真っ先に試される番号だからです。",
-	[S_TIP_CLEAR]      = L"パスワードをコピーしてから30秒後に、その間に\n"
-	                     L"ほかのものをコピーしていなければ、クリップボード\n"
-	                     L"から消去します。コピーがクリップボードの履歴\n"
-	                     L"(Win+V) やクラウドに送られることはありません。",
+	[S_TIP_CLEAR]      = L"コピーしたパスワードは、右で選んだ時間(変更しなければ\n"
+	                     L"2分)がたつか Wyrmhold を閉じたときに、クリップボード\n"
+	                     L"から消去されます。ただし、クリップボードの中身が\n"
+	                     L"Wyrmhold の入れたものとまったく同じ場合だけです。\n"
+	                     L"オフにすると、ほかのものをコピーするまで残ります。\n"
+	                     L"コピーがクリップボードの履歴 (Win+V) やクラウドに\n"
+	                     L"送られることはありません。",
+	[S_CLR_10S]        = L"10秒後",
+	[S_CLR_30S]        = L"30秒後",
+	[S_CLR_1M]         = L"1分後",
+	[S_CLR_2M]         = L"2分後\t既定",
+	[S_CLR_5M]         = L"5分後",
+	[S_CLR_10M]        = L"10分後",
+	[S_CLR_FMT_S]      = L"%d秒後",
+	[S_CLR_FMT_M]      = L"%d分後",
+	[S_TIP_CLEARTIME]  = L"コピーしたパスワードをクリップボードに残す時間。\n"
+	                     L"時間を選ぶと自動消去もオンになります。",
 	[S_WORDS_NOTE]     = L"EFF の英単語リスト (7776語) から選びます。1語ごとに 12.9 ビット。",
 	[S_PIN_NOTE]       = L"PIN が安全なのは、誤入力の回数が制限される場合だけです (カード、スマホ、錠前)。",
 	[S_GENERATE]       = L"生成",
@@ -474,6 +538,29 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_MENU_HELP]      = L"ヘルプ(&H)",
 	[S_MENU_HELPTOPICS]= L"ヘルプ(&H)\tF1",
 	[S_MENU_ABOUT]     = L"バージョン情報(&A)",
+	[S_MENU_UPDATE]    = L"更新の確認(&U)\x2026",
+	[S_MENU_UPDATE_AUTO] = L"毎日自動で更新を確認(&D)",
+	[S_UPD_UPTODATE]   = L"Wyrmhold %ls は最新版です。",
+	[S_UPD_AVAILABLE]  = L"Wyrmhold %ls が公開されています(現在のバージョン: %ls)。\nダウンロードページを開きますか？",
+	[S_UPD_PORTABLE]   = L"Wyrmhold %ls が公開されています(現在のバージョン: %ls)。\n\nこのコピーはポータブル版"
+	                     L"(セットアップでインストールしたものではありません)のため、自動では更新できません。"
+	                     L"ダウンロードページを開きますか？",
+	[S_UPD_ERROR]      = L"更新を確認できませんでした。\n%ls",
+	[S_UPD_ASK_HEAD]   = L"Wyrmhold %ls が公開されています",
+	[S_UPD_ASK]        = L"現在のバージョンは %ls です。更新は自動で行われます。セットアップをダウンロードして"
+	                     L"リリースの SHA-256 チェックサムと照合し、Wyrmhold を閉じ、同じ設定のまま新しい"
+	                     L"バージョンをインストールしてから、Wyrmhold をもう一度開きます。",
+	[S_UPD_NOW]        = L"今すぐ更新",
+	[S_UPD_NOTES]      = L"更新内容を見る",
+	[S_UPD_LATER]      = L"後で",
+	[S_UPD_CHECKING]   = L"更新を確認しています\x2026",
+	[S_UPD_DOWNLOADING]= L"Wyrmhold %ls をダウンロードしています\x2026 %ls",
+	[S_UPD_NOHASH]     = L"このリリースにはセットアップのチェックサムがありません。",
+	[S_UPD_BADHASH]    = L"ダウンロードしたセットアップがチェックサムと一致しないため、削除しました。",
+	[S_UPD_FAILED]     = L"更新をインストールできませんでした。\n%ls",
+	[S_UPD_UPDATED]    = L"Wyrmhold を %ls に更新しました。",
+	[S_UPD_NET]        = L"GitHub に接続できませんでした (エラー %lu)。",
+	[S_UPD_BADREPLY]   = L"GitHub からの応答を読み取れませんでした。",
 	[S_HELP_TITLE]     = L"Wyrmhold \x2014 ヘルプ",
 	[S_HELP_BODY]      =
 		L"# できること\n"
@@ -514,9 +601,20 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"普通のテキストです。「表示」→「テーマと色…」でテーマ(ライト、ダーク、Windows に合わせる)と"
 		L"12 色から色を選べます。アイコンの色も変わります(既定は黒)。\n"
 		L"# クリップボード\n"
-		L"「30秒後にクリップボードを消去」がオンのとき、コピーしたパスワードは30秒後、またはプログラムを"
-		L"閉じたときに消去されます(その間にほかのものをコピーした場合を除く)。コピーは常に Windows の"
-		L"クリップボード履歴 (Win+V) とクラウドから除外されます。\n"
+		L"「クリップボードを自動消去」がオン(既定)のとき、コピーしたパスワードは、その横で選んだ時間"
+		L"(既定は2分。10秒、30秒、1分、5分、10分も選べます)がたつか、プログラムを閉じたとき、"
+		L"どちらか早いほうで消去されます。消去するのは、クリップボードの中身が Wyrmhold の入れたものと"
+		L"まったく同じ場合だけです。後からコピーしたものには手を触れません。オフにすると、ほかのものを"
+		L"コピーするまで残ります。コピーは常に Windows のクリップボード履歴 (Win+V) とクラウドから"
+		L"除外されます。\n"
+		L"# 更新\n"
+		L"「ヘルプ」\x2192「更新の確認\x2026」で、新しいバージョンが公開されているかを GitHub に問い合わせます。"
+		L"「毎日自動で更新を確認」がオン(既定)なら、1日に1回自動でも確認します。あなたやパスワードに"
+		L"関する情報は何も送られません。新しいバージョンがあれば、「今すぐ更新」「更新内容を見る」"
+		L"「後で」の質問が1回だけ表示されます。「今すぐ更新」を選ぶと、セットアップをダウンロードして"
+		L"リリースの SHA-256 チェックサムと照合し(一致しないファイルは削除され、実行されることはありません)、"
+		L"Wyrmhold を閉じ、同じ設定のまま自動でインストールして、Wyrmhold をもう一度開きます。ポータブル版は"
+		L"自動では更新できないため、代わりにダウンロードページを開くことを提案します。\n"
 		L"# 設定\n"
 		L"設定は %APPDATA%\\Wyrmhold\\wyrmhold.ini に保存されます。USB メモリーや共有フォルダーから"
 		L"ポータブルで使うには、wyrmhold.exe と同じフォルダーに空の wyrmhold.ini を置いてください。\n"
@@ -599,7 +697,7 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_OPT_CAP]        = L"Mayúsculas",
 	[S_OPT_NUMBER]     = L"Agregar un dígito",
 	[S_OPT_NOSEQ]      = L"Sin seguidos tipo 123 o 987",
-	[S_OPT_CLEAR]      = L"Borrar portapapeles a los 30 s",
+	[S_OPT_CLEAR]      = L"Borrar portapapeles a los",
 	[S_TIP_AMBIG]      = L"Deja afuera 0, O, 1, l e I (y | ` ' \" entre los símbolos).\n"
 	                     L"Se parecen en muchas fuentes, así que una contraseña\n"
 	                     L"dictada o tipeada a mano falla menos.",
@@ -617,10 +715,22 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"que exigen un número.",
 	[S_TIP_NOSEQ]      = L"Ningún trío de dígitos que suba o baje de a uno,\n"
 	                     L"como 123 o 987: son los primeros que se prueban.",
-	[S_TIP_CLEAR]      = L"30 segundos después de copiar una contraseña se borra\n"
-	                     L"del portapapeles, salvo que hayas copiado otra cosa\n"
-	                     L"mientras tanto. Las copias nunca van al historial\n"
-	                     L"(Win+V) ni al portapapeles en la nube.",
+	[S_TIP_CLEAR]      = L"Una contraseña copiada se borra del portapapeles cuando\n"
+	                     L"pasa el tiempo elegido a la derecha (2 minutos si no lo\n"
+	                     L"cambiás) o al cerrar Wyrmhold, pero solo si el portapapeles\n"
+	                     L"sigue teniendo exactamente lo que puso Wyrmhold. Apagado,\n"
+	                     L"lo copiado queda hasta que copies otra cosa. Las copias\n"
+	                     L"nunca van al historial (Win+V) ni al portapapeles en la nube.",
+	[S_CLR_10S]        = L"10 s",
+	[S_CLR_30S]        = L"30 s",
+	[S_CLR_1M]         = L"1 min",
+	[S_CLR_2M]         = L"2 min\tpredeterminado",
+	[S_CLR_5M]         = L"5 min",
+	[S_CLR_10M]        = L"10 min",
+	[S_CLR_FMT_S]      = L"%d s",
+	[S_CLR_FMT_M]      = L"%d min",
+	[S_TIP_CLEARTIME]  = L"Cuánto tiempo queda en el portapapeles una contraseña copiada.\n"
+	                     L"Elegir un tiempo también enciende el borrado.",
 	[S_WORDS_NOTE]     = L"Palabras de la lista EFF de 7776 palabras en inglés: cada una suma 12,9 bits.",
 	[S_PIN_NOTE]       = L"Un PIN solo es seguro donde los intentos fallidos están limitados (tarjetas, teléfonos, cerraduras).",
 	[S_GENERATE]       = L"Generar",
@@ -711,6 +821,28 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_MENU_HELP]      = L"Ay&uda",
 	[S_MENU_HELPTOPICS]= L"&Ayuda\tF1",
 	[S_MENU_ABOUT]     = L"Acerca &de",
+	[S_MENU_UPDATE]    = L"Buscar act&ualizaciones\x2026",
+	[S_MENU_UPDATE_AUTO] = L"Buscar actualizaciones &todos los días",
+	[S_UPD_UPTODATE]   = L"Wyrmhold %ls está actualizado.",
+	[S_UPD_AVAILABLE]  = L"Está disponible Wyrmhold %ls (tenés la %ls).\n¿Abrir la página de descarga?",
+	[S_UPD_PORTABLE]   = L"Está disponible Wyrmhold %ls (tenés la %ls).\n\nEsta copia es portable (no se "
+	                     L"instaló con el instalador), así que no puede actualizarse sola. ¿Abrir la página de descarga?",
+	[S_UPD_ERROR]      = L"No se pudo buscar actualizaciones.\n%ls",
+	[S_UPD_ASK_HEAD]   = L"Está disponible Wyrmhold %ls",
+	[S_UPD_ASK]        = L"Tenés la %ls. La actualización se descarga e instala sola: el instalador se verifica "
+	                     L"contra las sumas SHA-256 de la versión publicada, Wyrmhold se cierra, la versión nueva "
+	                     L"se instala con las mismas opciones y Wyrmhold vuelve a abrirse.",
+	[S_UPD_NOW]        = L"Actualizar ahora",
+	[S_UPD_NOTES]      = L"Ver novedades",
+	[S_UPD_LATER]      = L"Más tarde",
+	[S_UPD_CHECKING]   = L"Buscando actualizaciones\x2026",
+	[S_UPD_DOWNLOADING]= L"Descargando Wyrmhold %ls\x2026 %ls",
+	[S_UPD_NOHASH]     = L"La versión publicada no trae la suma de verificación del instalador.",
+	[S_UPD_BADHASH]    = L"El instalador descargado no coincide con su suma de verificación; se borró.",
+	[S_UPD_FAILED]     = L"No se pudo instalar la actualización.\n%ls",
+	[S_UPD_UPDATED]    = L"Wyrmhold se actualizó a la %ls.",
+	[S_UPD_NET]        = L"Falló la conexión con GitHub (error %lu).",
+	[S_UPD_BADREPLY]   = L"No se pudo leer la respuesta de GitHub.",
 	[S_HELP_TITLE]     = L"Wyrmhold \x2014 Ayuda",
 	[S_HELP_BODY]      =
 		L"# Qué hace\n"
@@ -753,9 +885,20 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"se copia es texto común. En Ver → Tema y color… elegís el tema (claro, oscuro o como Windows) y "
 		L"uno de doce colores, que también pinta el ícono; el negro es el de fábrica.\n"
 		L"# Portapapeles\n"
-		L"Con «Borrar portapapeles a los 30 s» encendido, una contraseña copiada se borra 30 segundos después, "
-		L"o al cerrar el programa, salvo que se haya copiado otra cosa mientras tanto. Las copias nunca van al "
-		L"historial del portapapeles de Windows (Win+V) ni a la nube.\n"
+		L"Con «Borrar portapapeles a los» encendido (viene así), una contraseña copiada se borra cuando pasa el "
+		L"tiempo elegido al lado \x2014 2 minutos, salvo que elijas 10 s, 30 s, 1, 5 o 10 minutos \x2014 o apenas "
+		L"se cierra el programa, lo que ocurra primero. Se borra solo si el portapapeles sigue teniendo "
+		L"exactamente lo que puso Wyrmhold: lo que hayas copiado después no se toca. Apagado, lo copiado queda "
+		L"hasta que copies otra cosa. Las copias nunca van al historial del portapapeles de Windows (Win+V) ni "
+		L"a la nube.\n"
+		L"# Actualizaciones\n"
+		L"Ayuda \x2192 Buscar actualizaciones\x2026 le pregunta a GitHub si se publicó una versión nueva; con "
+		L"«Buscar actualizaciones todos los días» encendido (viene así) eso también se hace solo una vez por "
+		L"día. No se envía nada sobre vos ni sobre tus contraseñas. Si hay una, una sola pregunta: Actualizar "
+		L"ahora, Ver novedades o Más tarde. Actualizar ahora descarga el instalador, lo verifica contra las "
+		L"sumas SHA-256 de la versión publicada (un archivo que no coincide se borra y nunca se ejecuta), "
+		L"cierra Wyrmhold, instala en silencio con las mismas opciones y vuelve a abrir Wyrmhold. Una copia "
+		L"portable no puede actualizarse sola: en su lugar ofrece abrir la página de descarga.\n"
 		L"# Configuración\n"
 		L"Se guarda en %APPDATA%\\Wyrmhold\\wyrmhold.ini. Para usarlo portable, desde un pendrive o "
 		L"una carpeta compartida, poné un wyrmhold.ini vacío junto a wyrmhold.exe: entonces se usa ese.\n"

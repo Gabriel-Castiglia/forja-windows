@@ -26,6 +26,8 @@
 #define IDM_LANG_ES      308
 #define IDM_HELP         309
 #define IDM_ABOUT        310
+#define IDM_UPDATE       311     /* Help -> Check for updates */
+#define IDM_UPDATE_AUTO  312     /* Help -> Check for updates daily (on / off) */
 
 #define IDM_MODE_CHARS   320     /* + PW_CHARS, PW_WORDS, PW_PIN */
 #define IDM_MODE_WORDS   321
@@ -36,5 +38,6 @@
 #define IDM_THEMEDLG     344
 #define IDM_SYM_0        365     /* + PW_SYM_* */
 #define IDM_SEP_0        370     /* + PW_SEP_* */
+#define IDM_CLR_0        380     /* + index in CLEAR_CHOICES (wyrmhold.c) */
 
 #endif

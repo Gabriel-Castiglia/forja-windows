@@ -1,4 +1,4 @@
-# Wyrmhold -- the engine checks, run through the command line (/out).
+# Wyrmhold -- the engine checks, run through the command line (/out), and the self-test.
 # Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 # Date: November 9, 2026
 # SPDX-License-Identifier: GPL-2.0-only
@@ -73,6 +73,14 @@ foreach ($case in @(
     if ($p.ExitCode -ne 0) { "BAD  exit code $($p.ExitCode) for $($case.args -join ' ')"; $fail++; continue }
     Check $f $case.len $case.avoid $case.count $true ("program: " + ($(if ($case.args) {$case.args -join ' '} else {'(defaults)'})))
 }
+
+# the program's own self-test: clipboard wiping (on the real clipboard, saved and put back),
+# its settings in a throw-away .ini, and the update's pure functions (IsNewer, HashFor...)
+''
+$log = Join-Path $tmp 'selftest.log'
+$p = Start-Process -FilePath $exe -ArgumentList "/selftest:$log" -Wait -PassThru -NoNewWindow
+if (Test-Path $log) { Get-Content -LiteralPath $log | Select-Object -Skip 1 }
+if ($p.ExitCode -ne 0) { "BAD  self-test exit code $($p.ExitCode)"; $fail++ }
 
 Remove-Item -Recurse -Force $tmp
 

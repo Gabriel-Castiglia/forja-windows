@@ -25,10 +25,19 @@
       that turns into a check mark once the row has been copied;
     - copy one (icon, double-click, Enter, Ctrl+C), copy all (Ctrl+Shift+C), save (Ctrl+S);
     - copies are kept out of the clipboard history and the cloud clipboard, and are wiped
-      30 s later (or on exit) unless something else has been copied since;
+      when the chosen time is up (2 minutes by default; 10 s to 10 min in the window, 5 s
+      to 60 min in the .ini or on the command line; or never) or on exit,
+      whichever comes first -- only if the clipboard still holds exactly what we put there;
+    - Help -> Check for updates (and once a day by itself): one question, then the setup is
+      downloaded, checked against the release's SHA256SUMS.txt, run in silence, and the
+      program comes back (see "updates" below and update.c);
     - light, dark or follow-Windows theme and twelve accent colours (View -> Theme and
       colour), which also tint the icon;
-    - English, Japanese and Spanish; Help, About and Theme windows.
+    - English, Japanese and Spanish; Help, About and Theme windows;
+    - a layout that fits small screens: rows that do not fit the width go on to the next row
+      (down to 560 logical pixels), the band slims down or goes in a low window, then rows and
+      gaps tighten, and below that the part above the list scrolls while at least three
+      password rows stay in view. A new window is sized to its screen's work area.
 
   How it is drawn: the page, the cards, the labels, the field frames and the strength line
   are painted by the main window into a back buffer; the interactive parts are owner-drawn
@@ -51,10 +60,19 @@
                    /norepeat  /startletter  /sep:hyphen|space|dot|underscore|none|digit
                    /nocap  /nonumber  /allowruns  /preset:N
           window:  /theme:light|dark  /accent:N  /lang:en|jp|es  /open:help|about|theme
+                   /clearafter:N[s|m]|off
+        wyrmhold.exe /selftest:<log>
 
       /out writes the passwords (count up to 100000) and exits without a window; without
       options they use the standard profile. /entropy writes "bits pool check" and exits.
-      /shot draws the window into a bitmap and exits. None of them writes the .ini.
+      /shot draws the window into a bitmap and exits; with it, /shotdpi:N draws at another
+      scale and /shotarea:WxH stands in for the screen's work area (in pixels), to see the
+      window as on a small screen. None of them writes the .ini.
+      /clearafter sets how long a copy stays on the clipboard for this session only (seconds,
+      or minutes with "m"; 0 or "off" keeps copies); the .ini keeps the window's own choice.
+      /selftest checks the clipboard wiping, its settings and the update's pure functions
+      with a throw-away .ini, writes the report to <log> and exits with the number of
+      failures; the user's clipboard is saved first and put back afterwards.
 **/
 
 #include <windows.h>
@@ -68,11 +86,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <wchar.h>
 
 #include "pwgen.h"
 #include "resource.h"
 #include "ui_strings.h"
+#include "update.h"
 #include "version.h"
 
 #define WIDEN_(s)     L##s
@@ -232,10 +252,13 @@ enum {
 	IDC_CHIP_LOWER, IDC_CHIP_UPPER, IDC_CHIP_DIGITS, IDC_CHIP_SYMBOLS, IDC_SYMSET,
 	IDC_TG_AMBIG, IDC_TG_NOREPEAT, IDC_TG_START, IDC_EXCLUDE, IDC_CUSTOM,
 	IDC_SEPARATOR, IDC_TG_CAP, IDC_TG_NUMBER, IDC_TG_PINREPEAT, IDC_TG_NOSEQ,
-	IDC_GENERATE, IDC_TG_CLEAR, IDC_SAVE, IDC_COPYALL, IDC_LIST, IDC_STATUS
+	IDC_GENERATE, IDC_TG_CLEAR, IDC_SAVE, IDC_COPYALL, IDC_LIST, IDC_STATUS, IDC_CLEARTIME
 };
 
 enum { TMR_CLIP = 1, TMR_MARK = 2, TMR_REGEN = 3 };
+
+#define WM_APP_UPDATE    (WM_APP + 1)   /* lParam: the finished UpdJob */
+#define WM_APP_PROGRESS  (WM_APP + 2)   /* wParam: percent or -1, lParam: bytes so far */
 enum { ST_PLAIN, ST_OK, ST_WARN, ST_ERR };
 
 /* owner-drawn button kinds */
@@ -249,31 +272,40 @@ typedef struct {
 
 #define MAX_COUNT     50
 #define AUTO_MAX      100000
-#define CLIP_SECONDS  30
+#define CLIP_DEFAULT  120               /* seconds a copy stays on the clipboard */
+#define CLIP_MIN      5
+#define CLIP_MAX      3600
+
+/* the times the drop-down next to "Clear clipboard after" offers, in the order of S_CLR_* */
+static const int CLEAR_CHOICES[] = { 10, 30, 60, 120, 300, 600 };
+#define CLEAR_CHOICE_N ((int)(sizeof(CLEAR_CHOICES) / sizeof(CLEAR_CHOICES[0])))
 
 static int gDpi = 96;
 #define SC(v)  MulDiv((v), gDpi, 96)
 
 /* Logical units, at 96 dpi. SC() turns each one into pixels. */
-#define DESIGN_W   800
-#define MIN_W      760
-#define BAND_H     72
-#define ICON_SZ    44
-#define MARGIN     20
+#define DESIGN_W   780     /* the default client width */
+#define MIN_W      560     /* the narrowest client: below the design width, rows wrap */
+#define MIN_H      340     /* the lowest client: below what the content needs, the part above the list scrolls */
+#define BAND_FULL  60      /* the band with the title and the subtitle */
+#define BAND_SLIM  40      /* the title only, when the window is low */
+#define ICON_SZ    40
+#define MARGIN     16
 #define SEG_H      40
-#define CARD_OPT_H 266
 #define ROW_LH     36      /* one password row */
 #define ICON_ZONE  44      /* the copy icon at the right of a row */
-#define LIST_HEAD  52
-#define STATUS_H   40
+#define LIST_HEAD  48
+#define STATUS_H   36
 #define FIELD_H    32
+#define ROW_STEP   42      /* from one row of the options card to the next */
+#define MIN_ROWS   3       /* password rows always in view: in a low window the part above them scrolls */
 
 static HINSTANCE gInst;
-static HWND hMain, hTip, hList;
+static HWND hMain, hTip, hList, hStatus;
 static HWND hSeg[3], hProfile, hSlider, hLen, hCnt, hCntDec, hCntInc;
 static HWND hChip[4], hSymSet, hTgAmbig, hTgNoRepeat, hTgStart, hExclude, hCustom;
 static HWND hSeparator, hTgCap, hTgNumber, hTgPinRepeat, hTgNoSeq;
-static HWND hGenerate, hTgClear, hSave, hCopyAll;
+static HWND hGenerate, hTgClear, hClearTime, hSave, hCopyAll;
 static HWND hHelpWnd, hAboutWnd, hThemeWnd;
 static HICON gSwatchIcon[16];
 static HFONT fUi, fBold, fTitle, fSub, fSmall, fPw, fPwSmall;
@@ -282,7 +314,9 @@ static HMENU hMenu;
 
 static int gLang = LANG_EN;
 static PwOptions gOpt;                  /* what the controls show */
-static int gCount = 5, gClearClip = 1;
+static int gCount = 5, gClearClip = 1, gClearSecs = CLIP_DEFAULT;
+static int gClearFromArg = 0;           /* /clearafter set them: not saved unless changed in the window */
+static int gAutoUpdate = 1;             /* check for updates once a day */
 static int gCharNoRepeat = 0, gPinNoRepeat = 1;
 static char gCharExclude[PW_SET_MAX], gPinExclude[PW_SET_MAX];
 static int gNoSave = 0;
@@ -296,6 +330,8 @@ static int gMarkRow = -1;               /* row showing the check mark; -2 = all 
 static int gTrackingList = 0;
 
 static DWORD gClipSeq = 0;              /* clipboard sequence number right after our copy */
+static BYTE gClipHash[32];              /* SHA-256 of the text we copied (never the text itself) */
+static int gClipHave = 0;               /* gClipHash is set */
 static int gClipLeft = 0;               /* seconds until we wipe it; 0 = nothing pending */
 static wchar_t gClipMsg[256];
 
@@ -306,10 +342,19 @@ static wchar_t gLastFolder[MAX_PATH];
 
 /* where the main window paints what is not a control (filled by layout) */
 typedef struct { int str; RECT r; int style; } Label;
-enum { L_PLAIN, L_BOLD, L_HINT, L_TITLE };
+enum { L_PLAIN, L_BOLD, L_HINT, L_TITLE, L_LIST };   /* L_LIST: the list card's title */
 static Label gLabels[16];
 static int gLabelN = 0;
-static RECT gSegTrack, gCardOpt, gCardList, gStrength, gStatusR, gVersionR;
+static RECT gSegTrack, gCardOpt, gCardList, gStrength, gStatusR;
+static int gBandTop = 0, gBandH = 0;    /* the band as laid out: scrolled, slim or gone (0) */
+static int gScrollY = 0, gScrollMax = 0; /* in low windows the part above the list scrolls */
+static int gClipBottom = 0x7FFFFFFF;    /* ...and is cut off here, above the list card */
+static int gUpperBottom = 0, gListHeadH = 0;   /* bottom of the options card, height of the list's head */
+static int gMeasure = 0;                /* layout only measures: nothing is moved or recorded */
+static int gCompact = 0;                /* low window: tighter rows and gaps */
+#define STEP_PX  SC(gCompact ? 36 : ROW_STEP)
+#define GAP_PX   SC(gCompact ? 8 : 12)
+#define PAD_PX   SC(gCompact ? 10 : 14)
 static HWND gFieldEdit[4];
 static RECT gFieldBox[4];
 static int gFieldN = 0;
@@ -317,6 +362,7 @@ static int gFieldN = 0;
 #define T(id)  (STR[gLang][(id)])
 
 static void onOptionsChanged(int now);
+static LRESULT CALLBACK statusProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 static void syncControls(void);
 static void layout(void);
 
@@ -397,6 +443,8 @@ static void iniSetStr(const wchar_t* key, const wchar_t* v)
 }
 
 static int clampInt(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+static int maxInt(int a, int b) { return a > b ? a : b; }
+static int minInt(int a, int b) { return a < b ? a : b; }
 
 /* ------------------------------------------------------------------ the options in effect */
 
@@ -903,7 +951,7 @@ static void glyphPlusMinus(HDC dc, int cx, int cy, int s, COLORREF ink, int plus
 
 static void invalidateStatus(void)
 {
-	if (hMain) InvalidateRect(hMain, &gStatusR, FALSE);
+	if (hStatus) InvalidateRect(hStatus, NULL, FALSE);
 }
 
 static void setStatus(int kind, const wchar_t* text)
@@ -1034,17 +1082,86 @@ static int putClipboard(const wchar_t* text)
 
 	CloseClipboard();
 	gClipSeq = GetClipboardSequenceNumber();
+	gClipHave = upd_sha256(text, wcslen(text) * sizeof(wchar_t), gClipHash);
 	return 1;
 }
 
-/* Wipes the clipboard only if it still holds what we put there. */
+static void forgetClipboard(void)
+{
+	gClipHave = 0;
+	SecureZeroMemory(gClipHash, sizeof(gClipHash));
+}
+
+/* With the clipboard open: does its text hash to what we copied? */
+static int openClipboardIsOurs(void)
+{
+	HANDLE h;
+	const wchar_t* p;
+	SIZE_T cap;
+	size_t n = 0;
+	BYTE d[32];
+	int same = 0;
+
+	if (!gClipHave) return 0;
+	if (GetClipboardSequenceNumber() == gClipSeq) return 1;   /* nothing has touched it since */
+	h = GetClipboardData(CF_UNICODETEXT);
+	if (!h || (p = (const wchar_t*)GlobalLock(h)) == NULL) return 0;
+	cap = GlobalSize(h) / sizeof(wchar_t);
+	while (n < cap && p[n]) n++;
+	if (n < cap && upd_sha256(p, n * sizeof(wchar_t), d)) same = !memcmp(d, gClipHash, 32);
+	GlobalUnlock(h);
+	SecureZeroMemory(d, sizeof(d));
+	return same;
+}
+
+/* Something has changed the clipboard since our copy: is it still exactly our text (put
+ * back by a clipboard tool, say)? If so it stays ours, under its new sequence number. */
+static int clipboardStillOurs(void)
+{
+	int ours;
+
+	if (!gClipHave) return 0;
+	if (GetClipboardSequenceNumber() == gClipSeq) return 1;
+	if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !openClipboardRetry()) return 0;
+	ours = openClipboardIsOurs();
+	if (ours) gClipSeq = GetClipboardSequenceNumber();
+	CloseClipboard();
+	return ours;
+}
+
+/* Wipes the clipboard only if it still holds exactly what we put there. The check is made
+ * with the clipboard open, so nobody can copy something in between. */
 static int wipeOurClipboard(void)
 {
-	if (GetClipboardSequenceNumber() != gClipSeq) return 0;
-	if (!openClipboardRetry()) return 0;
-	EmptyClipboard();
+	int ours;
+
+	if (!gClipHave || !openClipboardRetry()) return 0;
+	ours = openClipboardIsOurs();
+	if (ours) EmptyClipboard();
 	CloseClipboard();
-	return 1;
+	if (ours) forgetClipboard();
+	return ours;
+}
+
+/* Closing (or the session ending) before the time is up: a copy waiting to be wiped goes now,
+ * if it is still ours. With clearing switched off nothing is waiting, and copies stay. */
+static void wipeOnExit(void)
+{
+	if (gClipLeft > 0) wipeOurClipboard();
+	gClipLeft = 0;
+	if (hMain) KillTimer(hMain, TMR_CLIP);
+}
+
+/* Starts the countdown for the copy just made, when clearing is on. */
+static void armClipWipe(void)
+{
+	KillTimer(hMain, TMR_CLIP);
+	gClipLeft = 0;
+	if (gClearClip)
+	{
+		gClipLeft = clampInt(gClearSecs, 1, CLIP_MAX);
+		SetTimer(hMain, TMR_CLIP, 1000, NULL);
+	}
 }
 
 static void showCopied(void)
@@ -1070,13 +1187,7 @@ static void afterCopy(int row)
 	InvalidateRect(hList, NULL, FALSE);
 	InvalidateRect(hCopyAll, NULL, FALSE);
 
-	KillTimer(hMain, TMR_CLIP);
-	gClipLeft = 0;
-	if (gClearClip)
-	{
-		gClipLeft = CLIP_SECONDS;
-		SetTimer(hMain, TMR_CLIP, 1000, NULL);
-	}
+	armClipWipe();
 	showCopied();
 }
 
@@ -1132,11 +1243,12 @@ static void copySelected(void)
 
 static void clipTick(void)
 {
-	if (GetClipboardSequenceNumber() != gClipSeq)
+	if (!clipboardStillOurs())
 	{
 		/* something else was copied: it is not ours to wipe */
 		KillTimer(hMain, TMR_CLIP);
 		gClipLeft = 0;
+		forgetClipboard();
 		showCopied();
 		return;
 	}
@@ -1146,6 +1258,7 @@ static void clipTick(void)
 		KillTimer(hMain, TMR_CLIP);
 		gClipLeft = 0;
 		if (wipeOurClipboard()) setStatus(ST_PLAIN, T(S_ST_CLEARED));
+		else { forgetClipboard(); showCopied(); }
 		return;
 	}
 	showCopied();
@@ -1315,11 +1428,29 @@ static COLORREF underColour(HWND h)
 	GetWindowRect(h, &r);
 	p.x = r.left; p.y = r.top;
 	ScreenToClient(hMain, &p);
-	if (p.y < SC(BAND_H)) return PAL.band;
+	if (p.y < gBandTop + gBandH) return PAL.band;
 	if (PtInRect(&gSegTrack, p)) return PAL.field;
 	if (p.y < gCardOpt.top) return PAL.page;
 	if (h == hCntDec || h == hCntInc) return PAL.field;
 	return PAL.card;
+}
+
+/* "2 min", "45 s"...: one of the drop-down's own texts when the time is one of its choices. */
+static void clearTimeText(int secs, wchar_t* buf, int cap)
+{
+	int i;
+
+	for (i = 0; i < CLEAR_CHOICE_N; i++)
+		if (CLEAR_CHOICES[i] == secs)
+		{
+			const wchar_t* s = T(S_CLR_10S + i);
+			_snwprintf(buf, cap, L"%.*ls", headLen(s), s);
+			buf[cap - 1] = 0;
+			return;
+		}
+	if (secs % 60 == 0) _snwprintf(buf, cap, T(S_CLR_FMT_M), secs / 60);
+	else                _snwprintf(buf, cap, T(S_CLR_FMT_S), secs);
+	buf[cap - 1] = 0;
 }
 
 static void dropText(HWND h, wchar_t* buf, int cap)
@@ -1335,6 +1466,7 @@ static void dropText(HWND h, wchar_t* buf, int cap)
 		const wchar_t* s = T(S_SYM_BASIC + gOpt.symbolSet);
 		_snwprintf(buf, cap, L"%.*ls", headLen(s), s);
 	}
+	else if (h == hClearTime) clearTimeText(gClearSecs, buf, cap);
 	else
 	{
 		const wchar_t* s = T(S_SEP_HYPHEN + gOpt.separator);
@@ -1428,7 +1560,9 @@ static void drawButton(const DRAWITEMSTRUCT* d)
 		t = r;
 		t.left += SC(12);
 		t.right -= SC(30);
-		drawText(mem, buf, -1, &t, fUi, PAL.text, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+		/* the clipboard time is greyed while clearing is off */
+		drawText(mem, buf, -1, &t, fUi, (d->hwndItem == hClearTime && !gClearClip) ? PAL.hint : PAL.text,
+		         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 		glyphChevron(mem, r.right - SC(16), h / 2, SC(9), PAL.hint);
 		break;
 	}
@@ -1517,7 +1651,7 @@ static LRESULT CALLBACK ctlProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_
 
 static HWND mkButton(HWND parent, int id, int kind, int str, int* bind, int value, int glyph)
 {
-	HWND b = CreateWindowExW(0, L"BUTTON", str >= 0 ? T(str) : L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+	HWND b = CreateWindowExW(0, L"BUTTON", str >= 0 ? T(str) : L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
 	                         0, 0, 10, 10, parent, (HMENU)(INT_PTR)id, gInst, NULL);
 	Ctl* c = (Ctl*)calloc(1, sizeof(Ctl));
 
@@ -1823,6 +1957,9 @@ static void buildMenu(HWND hwnd)
 
 	addItem(help, IDM_HELP, S_MENU_HELPTOPICS, 0);
 	addSep(help);
+	addItem(help, IDM_UPDATE, S_MENU_UPDATE, 0);
+	addItem(help, IDM_UPDATE_AUTO, S_MENU_UPDATE_AUTO, gAutoUpdate);
+	addSep(help);
 	addItem(help, IDM_ABOUT, S_MENU_ABOUT, 0);
 
 	AppendMenuW(bar, MF_POPUP | MF_OWNERDRAW, (UINT_PTR)file, (LPCWSTR)(ULONG_PTR)(S_MENU_FILE | MENU_BAR));
@@ -1849,6 +1986,8 @@ static UINT dropMenu(HWND button)
 	if (button == hProfile) fillPresetMenu(m);
 	else if (button == hSymSet)
 		for (i = 0; i <= PW_SYM_CUSTOM; i++) addItem(m, IDM_SYM_0 + i, S_SYM_BASIC + i, gOpt.symbolSet == i);
+	else if (button == hClearTime)
+		for (i = 0; i < CLEAR_CHOICE_N; i++) addItem(m, IDM_CLR_0 + i, S_CLR_10S + i, gClearSecs == CLEAR_CHOICES[i]);
 	else
 		for (i = 0; i < PW_SEP_COUNT; i++) addItem(m, IDM_SEP_0 + i, S_SEP_HYPHEN + i, gOpt.separator == i);
 
@@ -1905,6 +2044,7 @@ static void allTips(UINT msg)
 	setTip(hTgNumber, S_TIP_NUMBER, msg);    setTip(hTgPinRepeat, S_TIP_NOREPEAT, msg);
 	setTip(hTgNoSeq, S_TIP_NOSEQ, msg);      setTip(hGenerate, S_TIP_GENERATE, msg);
 	setTip(hTgClear, S_TIP_CLEAR, msg);      setTip(hCopyAll, S_TIP_COPYALL, msg);
+	setTip(hClearTime, S_TIP_CLEARTIME, msg);
 	setTip(hSave, S_TIP_SAVE, msg);
 	setStrengthTip(msg);
 }
@@ -2111,7 +2251,7 @@ static LRESULT CALLBACK listProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT
 
 static HWND mkEdit(int id, int limit, DWORD style)
 {
-	HWND e = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | style,
+	HWND e = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | style,
 	                         0, 0, 10, 10, hMain, (HMENU)(INT_PTR)id, gInst, NULL);
 	SendMessageW(e, WM_SETFONT, (WPARAM)fUi, FALSE);
 	SendMessageW(e, EM_SETLIMITTEXT, (WPARAM)limit, 0);
@@ -2135,7 +2275,7 @@ static void buildControls(void)
 		hSeg[i] = mkButton(hMain, IDC_SEG_CHARS + i, K_SEG, S_MODE_CHARS + i, NULL, PW_CHARS + i, G_NONE);
 	hProfile = mkButton(hMain, IDC_PROFILE, K_DROP, -1, NULL, 0, G_NONE);
 
-	hSlider = CreateWindowExW(0, L"WyrmholdSlider", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+	hSlider = CreateWindowExW(0, L"WyrmholdSlider", L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | WS_TABSTOP,
 	                          0, 0, 10, 10, hMain, (HMENU)(INT_PTR)IDC_SLIDER, gInst, NULL);
 	hLen = mkEdit(IDC_LEN, 3, ES_NUMBER | ES_CENTER);
 	hCntDec = mkButton(hMain, IDC_CNT_DEC, K_STEP, -1, NULL, 0, G_MINUS);
@@ -2165,14 +2305,27 @@ static void buildControls(void)
 	SendMessageW(hGenerate, WM_SETFONT, (WPARAM)fBold, FALSE);
 
 	hTgClear = mkButton(hMain, IDC_TG_CLEAR, K_TOGGLE, S_OPT_CLEAR, &gClearClip, 0, G_NONE);
+	hClearTime = mkButton(hMain, IDC_CLEARTIME, K_DROP, -1, NULL, 0, G_NONE);
 	hSave    = mkButton(hMain, IDC_SAVE, K_ICON, -1, NULL, 0, G_SAVE);
 	hCopyAll = mkButton(hMain, IDC_COPYALL, K_ICON, -1, NULL, 0, G_COPY);
 
-	hList = CreateWindowExW(0, L"LISTBOX", NULL, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
+	hList = CreateWindowExW(0, L"LISTBOX", NULL, WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
 	                        LBS_OWNERDRAWFIXED | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT,
 	                        0, 0, 10, 10, hMain, (HMENU)(INT_PTR)IDC_LIST, gInst, NULL);
 	SendMessageW(hList, WM_SETFONT, (WPARAM)fUi, FALSE);
 	SetWindowSubclass(hList, listProc, 1, 0);
+
+	{
+		WNDCLASSW sc;
+		ZeroMemory(&sc, sizeof(sc));
+		sc.lpfnWndProc = statusProc;
+		sc.hInstance = gInst;
+		sc.hCursor = LoadCursor(NULL, IDC_ARROW);
+		sc.lpszClassName = L"WyrmholdStatus";
+		RegisterClassW(&sc);
+		hStatus = CreateWindowExW(0, L"WyrmholdStatus", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+		                          0, 0, 10, 10, hMain, (HMENU)(INT_PTR)IDC_STATUS, gInst, NULL);
+	}
 
 	hTip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, NULL, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
 	                       CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hMain, NULL, gInst, NULL);
@@ -2213,12 +2366,17 @@ static void syncControls(void)
 
 static void place(HWND h, int x, int y, int w, int hh, int show)
 {
+	if (gMeasure) return;
 	SetWindowPos(h, NULL, x, y, w, hh, SWP_NOZORDER | SWP_NOACTIVATE | (show ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+	/* scrolled under the list card, or partly: only the part above shows. A control wholly
+	 * under it keeps an empty region rather than being hidden, so Tab still reaches it (and
+	 * keepFocusInView scrolls it back into view). */
+	SetWindowRgn(h, show && y + hh > gClipBottom ? CreateRectRgn(0, 0, w, maxInt(0, gClipBottom - y)) : NULL, FALSE);
 }
 
 static void addLabel(int str, int x, int y, int w, int h, int style)
 {
-	if (gLabelN >= 16) return;
+	if (gMeasure || gLabelN >= 16) return;
 	gLabels[gLabelN].str = str;
 	SetRect(&gLabels[gLabelN].r, x, y, x + w, y + h);
 	gLabels[gLabelN].style = style;
@@ -2233,6 +2391,7 @@ static void placeField(HWND e, int x, int y, int w, int show)
 	HGDIOBJ of = SelectObject(dc, fUi);
 	int eh;
 
+	if (gMeasure) { SelectObject(dc, of); ReleaseDC(e, dc); return; }
 	GetTextMetricsW(dc, &tm);
 	SelectObject(dc, of);
 	ReleaseDC(e, dc);
@@ -2248,164 +2407,343 @@ static void placeField(HWND e, int x, int y, int w, int show)
 
 static int toggleWidth(int str) { return SC(34 + 10 + 10) + textWidth(fUi, T(str), headLen(T(str))); }
 
-static void layout(void)
+/* Switches side by side, going on to the next row when the next one does not fit. Returns
+ * the top of the row after them. */
+static int flowToggles(HWND* hs, const int* strs, int n, int cx, int cr, int row)
 {
-	RECT rc;
-	int W, H, m = SC(MARGIN), y, x, i, segW, cx, cr, labelW, r1, r2, r3, r4, rb, sliderR, cntX, chipX;
-	int mode = gOpt.mode, chars = mode == PW_CHARS, words = mode == PW_WORDS, pin = mode == PW_PIN;
+	int x = cx, i;
+
+	for (i = 0; i < n; i++)
+	{
+		int w = minInt(toggleWidth(strs[i]), cr - cx);
+		if (x > cx && x + w > cr) { row += STEP_PX; x = cx; }
+		place(hs[i], x, row, w, SC(30), 1);
+		x += w + SC(24);
+	}
+	return row + STEP_PX;
+}
+
+/* The rows of the options card for one kind of password, from row down. Whatever does not
+ * fit the width goes on to a row of its own, so a narrow window wraps instead of cutting.
+ * The strength line and Generate come last, at bottomY when it is not negative (the foot of
+ * a card sized for the tallest kind). Returns the bottom of that last row. */
+static int optionRows(int mode, int cx, int cr, int row, int bottomY)
+{
 	static const int rowLabels[] = { S_LBL_LENGTH, S_LBL_WORDS, S_LBL_DIGITS, S_LBL_INCLUDE, S_LBL_SEPARATOR, S_LBL_EXCLUDE };
+	int chars = mode == PW_CHARS, words = mode == PW_WORDS, pin = mode == PW_PIN;
+	int inner = cr - cx, labelW = 0, i, x, step = STEP_PX, hb = SC(gCompact ? 40 : 44);
 
-	if (!hList) return;
-	GetClientRect(hMain, &rc);
-	W = rc.right;
-	H = rc.bottom;
-	gLabelN = 0;
-	gFieldN = 0;
-
-	/* the kind of password, and the profile on the right */
-	y = SC(BAND_H) + SC(16);
-	segW = SC(120);
-	for (i = 0; i < 3; i++)
-	{
-		int tw = textWidth(fBold, T(S_MODE_CHARS + i), -1) + SC(36);
-		if (tw > segW) segW = tw;
-	}
-	SetRect(&gSegTrack, m, y, m + 3 * segW + SC(4) * 4, y + SC(SEG_H));
-	for (i = 0; i < 3; i++)
-		place(hSeg[i], m + SC(4) + i * (segW + SC(4)), y + SC(4), segW, SC(SEG_H - 8), 1);
-	{
-		int pw = W - gSegTrack.right - SC(16) - m;
-		if (pw > SC(330)) pw = SC(330);
-		place(hProfile, W - m - pw, y + SC(4), pw, SC(SEG_H - 8), 1);
-	}
-
-	/* the options card */
-	y += SC(SEG_H) + SC(14);
-	SetRect(&gCardOpt, m, y, W - m, y + SC(CARD_OPT_H));
-	cx = m + SC(20);
-	cr = W - m - SC(20);
-	r1 = y + SC(18);
-	r2 = r1 + SC(48);
-	r3 = r2 + SC(46);
-	r4 = r3 + SC(44);
-	rb = gCardOpt.bottom - SC(18) - SC(44);
-
-	labelW = 0;
-	for (i = 0; i < 6; i++)
-	{
-		int tw = textWidth(fUi, T(rowLabels[i]), -1);
-		if (tw > labelW) labelW = tw;
-	}
+	for (i = 0; i < 6; i++) labelW = maxInt(labelW, textWidth(fUi, T(rowLabels[i]), -1));
 	labelW += SC(18);
 
-	/* row 1: slider + number, and how many on the right */
+	/* the slider and its number, and how many: on one row, or the count on the next */
 	{
 		int cntLbl = textWidth(fUi, T(S_LBL_COUNT), -1) + SC(12), stepW = SC(116);
-		cntX = cr - stepW;
-		addLabel(chars ? S_LBL_LENGTH : words ? S_LBL_WORDS : S_LBL_DIGITS, cx, r1, labelW, SC(FIELD_H), L_PLAIN);
-		addLabel(S_LBL_COUNT, cntX - cntLbl, r1, cntLbl, SC(FIELD_H), L_PLAIN);
-		sliderR = cntX - cntLbl - SC(28) - SC(64);
-		place(hSlider, cx + labelW - SC(10), r1, sliderR - (cx + labelW - SC(10)), SC(FIELD_H), 1);
-		placeField(hLen, sliderR + SC(10), r1, SC(60), 1);
-		place(hCntDec, cntX + SC(3), r1 + SC(3), SC(28), SC(FIELD_H - 6), 1);
-		placeField(hCnt, cntX + SC(32), r1, stepW - SC(64), 1);
-		place(hCntInc, cntX + stepW - SC(31), r1 + SC(3), SC(28), SC(FIELD_H - 6), 1);
-		/* the stepper's frame spans both buttons */
-		gFieldBox[gFieldN - 1].left = cntX;
-		gFieldBox[gFieldN - 1].right = cntX + stepW;
+		int sliderL = cx + labelW - SC(10), sliderR, cntX, cntLblX, cntRow;
+		if (labelW + SC(100 + 70 + 24) + cntLbl + stepW <= inner)
+		{
+			cntX = cr - stepW;
+			cntLblX = cntX - cntLbl;
+			sliderR = cntLblX - SC(24) - SC(70);
+			cntRow = row;
+		}
+		else
+		{
+			sliderR = cr - SC(70);
+			cntLblX = cx;
+			cntX = cx + maxInt(labelW, cntLbl);
+			cntRow = row + step;
+		}
+		addLabel(chars ? S_LBL_LENGTH : words ? S_LBL_WORDS : S_LBL_DIGITS, cx, row, labelW, SC(FIELD_H), L_PLAIN);
+		place(hSlider, sliderL, row, sliderR - sliderL, SC(FIELD_H), 1);
+		placeField(hLen, sliderR + SC(10), row, SC(60), 1);
+		addLabel(S_LBL_COUNT, cntLblX, cntRow, cntLbl, SC(FIELD_H), L_PLAIN);
+		place(hCntDec, cntX + SC(3), cntRow + SC(3), SC(28), SC(FIELD_H - 6), 1);
+		placeField(hCnt, cntX + SC(32), cntRow, stepW - SC(64), 1);
+		place(hCntInc, cntX + stepW - SC(31), cntRow + SC(3), SC(28), SC(FIELD_H - 6), 1);
+		if (!gMeasure && gFieldN > 0)
+		{
+			/* the stepper's frame spans both buttons */
+			gFieldBox[gFieldN - 1].left = cntX;
+			gFieldBox[gFieldN - 1].right = cntX + stepW;
+		}
+		row = cntRow + step;
 	}
 
-	/* row 2 */
-	chipX = cx + labelW;
 	if (chars)
 	{
+		/* the chips, then the symbol set on the same row when it fits */
 		int symW = SC(220), symLbl = textWidth(fUi, T(S_LBL_SYMBOLS), -1) + SC(12);
-		addLabel(S_LBL_INCLUDE, cx, r2, labelW, SC(FIELD_H), L_PLAIN);
+		addLabel(S_LBL_INCLUDE, cx, row, labelW, SC(FIELD_H), L_PLAIN);
+		x = cx + labelW;
 		for (i = 0; i < 4; i++)
 		{
 			int cw = textWidth(fBold, T(S_CHIP_LOWER + i), -1) + SC(42);
-			place(hChip[i], chipX, r2 + SC(1), cw, SC(30), 1);
-			chipX += cw + SC(8);
+			if (x > cx + labelW && x + cw > cr) { row += step; x = cx + labelW; }
+			place(hChip[i], x, row + SC(1), cw, SC(30), 1);
+			x += cw + SC(8);
 		}
-		if (chipX + SC(16) + symLbl + symW > cr) symW = cr - chipX - SC(16) - symLbl;
-		addLabel(S_LBL_SYMBOLS, cr - symW - symLbl, r2, symLbl, SC(FIELD_H), L_PLAIN);
-		place(hSymSet, cr - symW, r2, symW, SC(FIELD_H), 1);
+		if (x + SC(16) + symLbl + SC(150) <= cr)
+		{
+			symW = minInt(symW, cr - x - SC(16) - symLbl);
+			addLabel(S_LBL_SYMBOLS, cr - symW - symLbl, row, symLbl, SC(FIELD_H), L_PLAIN);
+			place(hSymSet, cr - symW, row, symW, SC(FIELD_H), 1);
+		}
+		else
+		{
+			int lw = maxInt(labelW, symLbl);
+			row += step;
+			symW = minInt(symW, cr - cx - lw);
+			addLabel(S_LBL_SYMBOLS, cx, row, lw, SC(FIELD_H), L_PLAIN);
+			place(hSymSet, cx + lw, row, symW, SC(FIELD_H), 1);
+		}
+		row += step;
 	}
-	else for (i = 0; i < 4; i++) place(hChip[i], 0, 0, 0, 0, 0);
-	if (!chars) place(hSymSet, 0, 0, 0, 0, 0);
+	else
+	{
+		for (i = 0; i < 4; i++) place(hChip[i], 0, 0, 0, 0, 0);
+		place(hSymSet, 0, 0, 0, 0, 0);
+	}
 
 	if (words)
 	{
-		addLabel(S_LBL_SEPARATOR, cx, r2, labelW, SC(FIELD_H), L_PLAIN);
-		place(hSeparator, cx + labelW, r2, SC(230), SC(FIELD_H), 1);
+		addLabel(S_LBL_SEPARATOR, cx, row, labelW, SC(FIELD_H), L_PLAIN);
+		place(hSeparator, cx + labelW, row, minInt(SC(230), cr - cx - labelW), SC(FIELD_H), 1);
+		row += step;
 	}
 	else place(hSeparator, 0, 0, 0, 0, 0);
 
-	/* row 3: switches */
-	x = cx;
+	/* switches */
 	if (chars)
 	{
-		int w1 = toggleWidth(S_OPT_AMBIG), w2 = toggleWidth(S_OPT_NOREPEAT), w3 = toggleWidth(S_OPT_START);
-		place(hTgAmbig, x, r3, w1, SC(30), 1);    x += w1 + SC(24);
-		place(hTgNoRepeat, x, r3, w2, SC(30), 1); x += w2 + SC(24);
-		place(hTgStart, x, r3, w3, SC(30), 1);
+		HWND hs[3] = { hTgAmbig, hTgNoRepeat, hTgStart };
+		static const int ss[3] = { S_OPT_AMBIG, S_OPT_NOREPEAT, S_OPT_START };
+		row = flowToggles(hs, ss, 3, cx, cr, row);
 	}
 	else { place(hTgAmbig, 0, 0, 0, 0, 0); place(hTgNoRepeat, 0, 0, 0, 0, 0); place(hTgStart, 0, 0, 0, 0, 0); }
 
 	if (words)
 	{
-		int w1 = toggleWidth(S_OPT_CAP), w2 = toggleWidth(S_OPT_NUMBER);
-		place(hTgCap, x, r3, w1, SC(30), 1);  x += w1 + SC(24);
-		place(hTgNumber, x, r3, w2, SC(30), 1);
-		addLabel(S_WORDS_NOTE, cx, r4, cr - cx, SC(FIELD_H), L_HINT);
+		HWND hs[2] = { hTgCap, hTgNumber };
+		static const int ss[2] = { S_OPT_CAP, S_OPT_NUMBER };
+		row = flowToggles(hs, ss, 2, cx, cr, row);
+		addLabel(S_WORDS_NOTE, cx, row, inner, SC(FIELD_H), L_HINT);
+		row += step;
 	}
 	else { place(hTgCap, 0, 0, 0, 0, 0); place(hTgNumber, 0, 0, 0, 0, 0); }
 
 	if (pin)
 	{
-		int w1 = toggleWidth(S_OPT_NOREPEAT), w2 = toggleWidth(S_OPT_NOSEQ);
-		place(hTgPinRepeat, cx, r2, w1, SC(30), 1);
-		place(hTgNoSeq, cx + w1 + SC(24), r2, w2, SC(30), 1);
-		addLabel(S_PIN_NOTE, cx, r3, cr - cx, SC(30), L_HINT);
+		HWND hs[2] = { hTgPinRepeat, hTgNoSeq };
+		static const int ss[2] = { S_OPT_NOREPEAT, S_OPT_NOSEQ };
+		row = flowToggles(hs, ss, 2, cx, cr, row);
+		addLabel(S_PIN_NOTE, cx, row, inner, SC(30), L_HINT);
+		row += step;
 	}
 	else { place(hTgPinRepeat, 0, 0, 0, 0, 0); place(hTgNoSeq, 0, 0, 0, 0, 0); }
 
-	/* row 4: leave out (characters and PIN), my own symbols (characters, custom set) */
+	/* leave out (characters and PIN), my own symbols (characters, custom set) */
 	if (chars || pin)
 	{
-		addLabel(S_LBL_EXCLUDE, cx, r4, labelW, SC(FIELD_H), L_PLAIN);
-		placeField(hExclude, cx + labelW, r4, SC(170), 1);
+		int fw = minInt(SC(170), cr - cx - labelW);
+		addLabel(S_LBL_EXCLUDE, cx, row, labelW, SC(FIELD_H), L_PLAIN);
+		placeField(hExclude, cx + labelW, row, fw, 1);
+		if (chars && gOpt.symbolSet == PW_SYM_CUSTOM)
+		{
+			int lw = textWidth(fUi, T(S_LBL_CUSTOM), -1) + SC(12);
+			x = cx + labelW + fw + SC(24);
+			if (x + lw + SC(120) > cr) { row += step; x = cx; lw = maxInt(lw, labelW); }
+			addLabel(S_LBL_CUSTOM, x, row, lw, SC(FIELD_H), L_PLAIN);
+			placeField(hCustom, x + lw, row, minInt(SC(200), cr - x - lw), 1);
+		}
+		else place(hCustom, 0, 0, 0, 0, 0);
+		row += step;
 	}
-	else place(hExclude, 0, 0, 0, 0, 0);
+	else { place(hExclude, 0, 0, 0, 0, 0); place(hCustom, 0, 0, 0, 0, 0); }
 
-	if (chars && gOpt.symbolSet == PW_SYM_CUSTOM)
+	/* the strength line and Generate: side by side, or one above the other when narrow */
+	if (bottomY >= 0) row = maxInt(row, bottomY);
+	if (inner >= SC(560))
 	{
-		int lw = textWidth(fUi, T(S_LBL_CUSTOM), -1) + SC(12);
-		x = cx + labelW + SC(170) + SC(24);
-		addLabel(S_LBL_CUSTOM, x, r4, lw, SC(FIELD_H), L_PLAIN);
-		placeField(hCustom, x + lw, r4, SC(200), 1);
+		place(hGenerate, cr - SC(160), row, SC(160), hb, 1);
+		if (!gMeasure) SetRect(&gStrength, cx, row, cr - SC(180), row + hb);
+		row += hb;
 	}
-	else place(hCustom, 0, 0, 0, 0, 0);
-
-	/* bottom row: strength and the button */
-	place(hGenerate, cr - SC(160), rb, SC(160), SC(44), 1);
-	SetRect(&gStrength, cx, rb, cr - SC(180), rb + SC(44));
-
-	/* the list card */
-	y = gCardOpt.bottom + SC(14);
-	SetRect(&gCardList, m, y, W - m, H - SC(STATUS_H));
-	addLabel(S_CARD_LIST, cx, y + SC(10), SC(300), SC(32), L_BOLD);
-	place(hCopyAll, cr - SC(34) + SC(8), y + SC(10), SC(34), SC(32), 1);
-	place(hSave, cr - SC(72) + SC(8), y + SC(10), SC(34), SC(32), 1);
+	else
 	{
-		int tw = toggleWidth(S_OPT_CLEAR);
-		place(hTgClear, cr - SC(72) + SC(8) - SC(16) - tw, y + SC(11), tw, SC(30), 1);
+		if (!gMeasure) SetRect(&gStrength, cx, row, cr, row + hb);
+		row += hb + SC(6);
+		place(hGenerate, cx, row, inner, SC(40), 1);
+		row += SC(40);
 	}
-	place(hList, m + SC(10), y + SC(LIST_HEAD), W - 2 * m - SC(20), gCardList.bottom - y - SC(LIST_HEAD) - SC(10), 1);
+	return row;
+}
 
-	/* status line */
-	SetRect(&gStatusR, m + SC(4), H - SC(STATUS_H), W - m - SC(80), H);
-	SetRect(&gVersionR, W - m - SC(80), H - SC(STATUS_H), W - m, H);
+/* Everything above the password rows, from y0 down, with a band of bandH (0 = none). The
+ * list card follows the options card, or starts at listY when that is not negative (a low
+ * window, where the list stays put and the part above it scrolls). Returns the top of the
+ * password rows; gUpperBottom and gListHeadH say where the options end and how high the
+ * list's head is. With gMeasure set it only measures. */
+static int layoutTop(int W, int y0, int bandH, int listY)
+{
+	int m = SC(MARGIN), inner = W - 2 * m, y, i, segW = SC(110), track, cx, cr, cardTop, cardBottom, saved, k;
+
+	if (!gMeasure) { gBandTop = y0; gBandH = bandH; }
+	y = y0 + bandH + GAP_PX;
+
+	/* the kind of password, and the profile on the right -- or under it when narrow */
+	for (i = 0; i < 3; i++) segW = maxInt(segW, textWidth(fBold, T(S_MODE_CHARS + i), -1) + SC(32));
+	if (3 * segW + SC(16) > inner) segW = (inner - SC(16)) / 3;
+	track = 3 * segW + SC(16);
+	if (!gMeasure) SetRect(&gSegTrack, m, y, m + track, y + SC(SEG_H));
+	for (i = 0; i < 3; i++)
+		place(hSeg[i], m + SC(4) + i * (segW + SC(4)), y + SC(4), segW, SC(SEG_H - 8), 1);
+	if (track + SC(12) + SC(220) <= inner)
+	{
+		int pw = minInt(SC(330), inner - track - SC(12));
+		place(hProfile, W - m - pw, y + SC(4), pw, SC(SEG_H - 8), 1);
+		y += SC(SEG_H);
+	}
+	else
+	{
+		y += SC(SEG_H) + SC(8);
+		place(hProfile, m, y, inner, SC(SEG_H - 8), 1);
+		y += SC(SEG_H - 8);
+	}
+	y += GAP_PX;
+
+	/* the options card: as high as the tallest of the three kinds needs at this width, so the
+	 * list does not jump when the kind changes */
+	cardTop = y;
+	cx = m + SC(18);
+	cr = W - m - SC(18);
+	saved = gMeasure;
+	gMeasure = 1;
+	cardBottom = 0;
+	for (k = PW_CHARS; k <= PW_PIN; k++) cardBottom = maxInt(cardBottom, optionRows(k, cx, cr, cardTop + PAD_PX, -1));
+	gMeasure = saved;
+	if (!gMeasure)
+	{
+		/* the strength line and Generate stay at the foot of the card, whatever the kind */
+		int foot = cr - cx >= SC(560) ? SC(gCompact ? 40 : 44) : SC(gCompact ? 40 : 44) + SC(6 + 40);
+		optionRows(gOpt.mode, cx, cr, cardTop + PAD_PX, cardBottom - foot);
+	}
+	cardBottom += PAD_PX;
+	if (!gMeasure) SetRect(&gCardOpt, m, cardTop, W - m, cardBottom);
+	gUpperBottom = cardBottom;
+
+	/* the list card's head: the title and the icons, and "Clear clipboard after [2 min v]"
+	 * beside them, or on a line of its own when narrow. It is never cut off. */
+	y = listY >= 0 ? listY : cardBottom + GAP_PX;
+	saved = gClipBottom;
+	gClipBottom = 0x7FFFFFFF;
+	{
+		int tw = toggleWidth(S_OPT_CLEAR), dw = 0, titleW = textWidth(fBold, T(S_CARD_LIST), -1) + SC(16);
+		int icons = SC(72), xr = cr - icons - SC(8), head = SC(gCompact ? LIST_HEAD - 6 : LIST_HEAD), hy = y + SC(gCompact ? 5 : 8);
+		for (k = 0; k < CLEAR_CHOICE_N; k++)
+			dw = maxInt(dw, textWidth(fUi, T(S_CLR_10S + k), headLen(T(S_CLR_10S + k))));
+		dw += SC(12 + 30);
+		if (!gMeasure) SetRect(&gCardList, m, y, W - m, y);           /* the bottom comes later */
+		addLabel(S_CARD_LIST, cx, hy, minInt(SC(300), titleW), SC(32), L_LIST);
+		place(hCopyAll, cr - SC(34) + SC(8), hy, SC(34), SC(32), 1);
+		place(hSave, cr - SC(72) + SC(8), hy, SC(34), SC(32), 1);
+		if (cx + titleW + tw + SC(6) + dw <= xr)
+		{
+			place(hClearTime, xr - dw, hy, dw, SC(32), 1);
+			place(hTgClear, xr - dw - SC(6) - tw, hy + SC(1), tw, SC(30), 1);
+		}
+		else
+		{
+			tw = minInt(tw, cr - cx - SC(6) - dw);
+			place(hTgClear, cx, hy + SC(38), tw, SC(30), 1);
+			place(hClearTime, cx + tw + SC(6), hy + SC(37), dw, SC(32), 1);
+			head += SC(38);
+		}
+		gListHeadH = head;
+		y += head;
+	}
+	gClipBottom = saved;
+	return y;
+}
+
+static void layout(void)
+{
+	static int busy = 0, again = 0;
+	RECT rc;
+	int W, H, avail, top, listH, band, contentH, m = SC(MARGIN), tries = 0;
+
+	if (!hList) return;
+	if (busy) { again = 1; return; }      /* the scroll bar came or went: lay out again after */
+	busy = 1;
+	do
+	{
+		SCROLLINFO si;
+
+		again = 0;
+		GetClientRect(hMain, &rc);
+		W = rc.right;
+		H = rc.bottom;
+		avail = H - SC(STATUS_H);
+
+		/* the band: whole while the list still shows five rows, slim for four, otherwise none;
+		 * then, still too low, tighter rows and gaps; then the part above the list scrolls */
+		gMeasure = 1;
+		gCompact = 0;
+		band = SC(BAND_FULL);
+		if (layoutTop(W, 0, band, -1) + SC(5 * ROW_LH + 8) > avail)
+		{
+			band = SC(BAND_SLIM);
+			if (layoutTop(W, 0, band, -1) + SC(4 * ROW_LH + 8) > avail) band = 0;
+			if (!band && layoutTop(W, 0, band, -1) + SC(4 * ROW_LH + 8) > avail) gCompact = 1;
+		}
+		top = layoutTop(W, 0, band, -1);
+		gMeasure = 0;
+
+		gLabelN = 0;
+		gFieldN = 0;
+		if (top + SC(MIN_ROWS * ROW_LH + 8) <= avail)
+		{
+			/* everything fits: the list takes what is left */
+			gScrollY = gScrollMax = 0;
+			gClipBottom = 0x7FFFFFFF;
+			listH = avail - top - SC(8);
+			contentH = avail;
+			top = layoutTop(W, 0, band, -1);
+		}
+		else
+		{
+			/* too low: the list card keeps MIN_ROWS rows at the bottom, and the part above it
+			 * scrolls in what is left, cut off just above the card */
+			int listY = avail - gListHeadH - SC(MIN_ROWS * ROW_LH + 8);
+			listH = SC(MIN_ROWS * ROW_LH);
+			gClipBottom = maxInt(0, listY - SC(10));
+			contentH = gUpperBottom + SC(10);
+			gScrollMax = maxInt(0, contentH - gClipBottom);
+			gScrollY = maxInt(0, minInt(gScrollY, gScrollMax));
+			contentH = gClipBottom + gScrollMax;
+			top = layoutTop(W, -gScrollY, band, listY);
+		}
+		gCardList.bottom = top + listH + SC(8);
+		{
+			int clip = gClipBottom;           /* the list itself is never cut off */
+			gClipBottom = 0x7FFFFFFF;
+			place(hList, m + SC(10), top, W - 2 * m - SC(20), listH, 1);
+			gClipBottom = clip;
+		}
+
+		/* status line, fixed at the bottom and on top of everything else */
+		SetRect(&gStatusR, 0, H - SC(STATUS_H), W, H);
+		if (hStatus) SetWindowPos(hStatus, HWND_TOP, 0, gStatusR.top, W, SC(STATUS_H), SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+		ZeroMemory(&si, sizeof(si));
+		si.cbSize = sizeof(si);
+		si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+		si.nMax = contentH - 1;
+		si.nPage = (UINT)maxInt(gScrollMax ? gClipBottom : avail, 1);
+		si.nPos = gScrollY;
+		SetScrollInfo(hMain, SB_VERT, &si, TRUE);
+	} while (again && ++tries < 3);
+	busy = 0;
 
 	if (hTip) setStrengthTip(TTM_NEWTOOLRECTW);
 	/* Every child was moved or resized: repaint all of them whole. Moving a child only
@@ -2414,31 +2752,67 @@ static void layout(void)
 	RedrawWindow(hMain, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 }
 
+/* Scrolls the part above the list (low windows only). */
+static void scrollTo(int y)
+{
+	y = maxInt(0, minInt(y, gScrollMax));
+	if (y == gScrollY) return;
+	gScrollY = y;
+	layout();
+}
+
+/* Tab moved the focus to a control scrolled out of sight: scroll it back into view. */
+static void keepFocusInView(void)
+{
+	static HWND last = NULL;
+	HWND f = GetFocus();
+	RECT r;
+
+	if (f == last) return;
+	last = f;
+	if (!f || gScrollMax <= 0 || GetParent(f) != hMain) return;
+	if (f == hList || f == hTgClear || f == hClearTime || f == hSave || f == hCopyAll) return;   /* never scrolled */
+	GetWindowRect(f, &r);
+	MapWindowPoints(NULL, hMain, (POINT*)&r, 2);
+	if (r.top < 0) scrollTo(gScrollY + r.top - SC(8));
+	else if (r.bottom > gClipBottom) scrollTo(gScrollY + r.bottom - gClipBottom + SC(8));
+}
+
 /* ------------------------------------------------------------------ painting */
 
 static void paintBand(HDC dc, int W)
 {
 	RECT band;
-	GpGraphics* g = gfx(dc);
-	int tx = SC(20 + ICON_SZ + 16);
+	GpGraphics* g;
+	int top = gBandTop, h = gBandH, slim = gBandH < SC(BAND_FULL), icon = slim ? SC(28) : SC(ICON_SZ);
+	int tx = SC(MARGIN) + icon + SC(14);
 
-	SetRect(&band, 0, 0, W, SC(BAND_H));
+	/* whole: the icon, the title and the subtitle; slim: the title only; low windows: none */
+	if (h <= 0 || top + h <= 0) return;
+	SetRect(&band, 0, top, W, top + h);
+	g = gfx(dc);
 	if (g)
 	{
 		GpPointF a = { 0, 0 }, b = { (float)W, 0 };
 		GpBrush* br = NULL;
 		GdipCreateLineBrush(&a, &b, argb(PAL.band, 255), argb(PAL.band2, 255), 0, &br);
-		if (br) { GdipFillRectangle(g, br, 0, 0, (float)W, (float)SC(BAND_H)); GdipDeleteBrush(br); }
+		if (br) { GdipFillRectangle(g, br, 0, (float)top, (float)W, (float)h); GdipDeleteBrush(br); }
 		GdipDeleteGraphics(g);
 	}
 	else fillSolid(dc, &band, PAL.band);
 
 	if (icBand)
-		DrawIconEx(dc, SC(20), (SC(BAND_H) - SC(ICON_SZ)) / 2, icBand, SC(ICON_SZ), SC(ICON_SZ), 0, NULL, DI_NORMAL);
+		DrawIconEx(dc, SC(MARGIN), top + (h - icon) / 2, icBand, icon, icon, 0, NULL, DI_NORMAL);
 
-	SetRect(&band, tx, SC(12), W - SC(20), SC(44));
+	if (slim)
+	{
+		SetRect(&band, tx, top, W - SC(20), top + h);
+		drawText(dc, T(S_APP_TITLE), -1, &band, fTitle, PAL.bandText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+		return;
+	}
+	SetRect(&band, tx, top + SC(5), W - SC(20), top + SC(34));
 	drawText(dc, T(S_APP_TITLE), -1, &band, fTitle, PAL.bandText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-	SetRect(&band, tx + SC(1), SC(42), W - SC(20), SC(62));
+	SetRect(&band, tx + SC(1), top + SC(33), W - SC(20), top + SC(53));
 	drawText(dc, T(S_APP_SUBTITLE), -1, &band, fSub, PAL.bandSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
@@ -2449,11 +2823,13 @@ static void paintMain(HDC dc)
 
 	GetClientRect(hMain, &rc);
 	fillSolid(dc, &rc, PAL.page);
-	paintBand(dc, rc.right);
 
+	/* the part above the list, cut off above the list card when it scrolls */
+	SaveDC(dc);
+	if (gClipBottom < rc.bottom) IntersectClipRect(dc, 0, 0, rc.right, gClipBottom);
+	paintBand(dc, rc.right);
 	roundRect(dc, &gSegTrack, SC(10), PAL.field, PAL.border, (float)SC(1));
 	roundRect(dc, &gCardOpt, SC(12), PAL.card, PAL.border, (float)SC(1));
-	roundRect(dc, &gCardList, SC(12), PAL.card, PAL.border, (float)SC(1));
 
 	for (i = 0; i < gFieldN; i++)
 	{
@@ -2464,20 +2840,57 @@ static void paintMain(HDC dc)
 	for (i = 0; i < gLabelN; i++)
 	{
 		const Label* l = &gLabels[i];
+		if (l->style == L_LIST) continue;                   /* the list's title: below */
 		r = l->r;
 		drawText(dc, T(l->str), -1, &r, l->style == L_BOLD ? fBold : l->style == L_HINT ? fSmall : fUi,
 		         l->style == L_HINT ? PAL.hint : PAL.text,
 		         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 	}
-
 	paintStrength(dc);
+	RestoreDC(dc, -1);
 
-	r = gStatusR;
-	drawText(dc, gStatusText, -1, &r, fUi,
-	         gStatusKind == ST_ERR ? PAL.err : gStatusKind == ST_WARN ? PAL.warn : gStatusKind == ST_OK ? PAL.ok : PAL.hint,
-	         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-	r = gVersionR;
-	drawText(dc, L"v" APP_VERSION, -1, &r, fUi, PAL.hint, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+	/* the list card, never cut off */
+	roundRect(dc, &gCardList, SC(12), PAL.card, PAL.border, (float)SC(1));
+	for (i = 0; i < gLabelN; i++)
+		if (gLabels[i].style == L_LIST)
+		{
+			r = gLabels[i].r;
+			drawText(dc, T(gLabels[i].str), -1, &r, fBold, PAL.text, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+		}
+}
+
+/* The status line is a child window of its own, on top of the others: in a low window the
+ * content scrolls under it, and every control clips its siblings, so nothing paints over it. */
+static LRESULT CALLBACK statusProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+	if (msg == WM_PAINT)
+	{
+		PAINTSTRUCT ps;
+		HDC dc = BeginPaint(hwnd, &ps), mem = CreateCompatibleDC(dc);
+		RECT rc, r;
+		HBITMAP bmp;
+		HGDIOBJ ob;
+		int m = SC(MARGIN);
+
+		GetClientRect(hwnd, &rc);
+		bmp = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
+		ob = SelectObject(mem, bmp);
+		fillSolid(mem, &rc, PAL.page);
+		SetRect(&r, m + SC(4), 0, rc.right - m - SC(80), rc.bottom);
+		drawText(mem, gStatusText, -1, &r, fUi,
+		         gStatusKind == ST_ERR ? PAL.err : gStatusKind == ST_WARN ? PAL.warn : gStatusKind == ST_OK ? PAL.ok : PAL.hint,
+		         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+		SetRect(&r, rc.right - m - SC(80), 0, rc.right - m, rc.bottom);
+		drawText(mem, L"v" APP_VERSION, -1, &r, fUi, PAL.hint, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+		BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
+		SelectObject(mem, ob);
+		DeleteObject(bmp);
+		DeleteDC(mem);
+		EndPaint(hwnd, &ps);
+		return 0;
+	}
+	if (msg == WM_ERASEBKGND) return 1;
+	return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
 /* ------------------------------------------------------------------ help window */
@@ -3070,6 +3483,326 @@ static void setLanguage(int lang)
 	applyLanguage();
 }
 
+/* ------------------------------------------------------------------ updates */
+
+/* Help -> Check for updates (and once a day by itself), as in the sister program Gryphmark:
+ * when GitHub has a newer release, one question, and then everything happens alone. The setup
+ * is downloaded and checked against the release's SHA256SUMS.txt (a file that does not match
+ * is deleted, never run); the window closes (a copy waiting to be wiped goes, as on any exit);
+ * the setup runs in silence keeping the install options, waits for this process to be gone
+ * (/WHWAITPID) and starts the program again (/WHRELAUNCH, see installer/Wyrmhold.iss). A
+ * portable copy cannot be installed over: it is offered the download page. The network work
+ * runs on a thread of its own, which reports through WM_APP_UPDATE and WM_APP_PROGRESS. */
+
+#define UPD_AGENT     L"Wyrmhold/" APP_VERSION
+#define UPD_PAGE      L"https://" APP_REPO L"/releases/latest"
+
+typedef struct UpdJob {
+	int stage;                          /* 0 the check, 1 the download */
+	int interactive;                    /* asked for from the menu: say so when nothing is new */
+	DWORD err;                          /* Win32 / WinHTTP error, or HTTP status; 0 = none */
+	int errStr;                         /* or a string saying what went wrong; 0 = none */
+	UpdRelease rel;
+	wchar_t file[MAX_PATH];             /* the verified setup (stage 1) */
+} UpdJob;
+
+static int gUpdBusy = 0;                /* a check or a download is running */
+static UpdJob* gUpdCheck = NULL;        /* the check running, if any (only the window's thread uses it) */
+static int gUpdDownloading = 0;
+static wchar_t gUpdTag[64];             /* the version being downloaded, for the status line */
+
+typedef struct { char* p; size_t n, cap; } MemSink;
+typedef struct { HANDLE f; int lastPct; ULONGLONG lastMb; } FileSink;
+
+static int sinkMem(void* ctx, const BYTE* d, DWORD n, ULONGLONG done, ULONGLONG total)
+{
+	MemSink* m = (MemSink*)ctx;
+
+	(void)done; (void)total;
+	if (m->n + n + 1 > m->cap) return 0;        /* larger than any answer we expect */
+	memcpy(m->p + m->n, d, n);
+	m->n += n;
+	m->p[m->n] = 0;
+	return 1;
+}
+
+static int sinkFile(void* ctx, const BYTE* d, DWORD n, ULONGLONG done, ULONGLONG total)
+{
+	FileSink* s = (FileSink*)ctx;
+	DWORD w;
+
+	if (!WriteFile(s->f, d, n, &w, NULL) || w != n) return 0;
+	if (total)
+	{
+		int pct = (int)(done * 100 / total);
+		if (pct != s->lastPct) { s->lastPct = pct; PostMessageW(hMain, WM_APP_PROGRESS, (WPARAM)pct, (LPARAM)done); }
+	}
+	else if ((done >> 20) != s->lastMb) { s->lastMb = done >> 20; PostMessageW(hMain, WM_APP_PROGRESS, (WPARAM)-1, (LPARAM)done); }
+	return 1;
+}
+
+static void finishJob(UpdJob* j)
+{
+	if (!PostMessageW(hMain, WM_APP_UPDATE, 0, (LPARAM)j)) free(j);     /* the window is gone */
+}
+
+/* The thread of the check: the latest release, as the GitHub API describes it. */
+static DWORD WINAPI checkThread(void* arg)
+{
+	UpdJob* j = (UpdJob*)arg;
+	MemSink m;
+
+	m.cap = 1 << 20;
+	m.n = 0;
+	m.p = (char*)malloc(m.cap);
+	if (!m.p) j->err = ERROR_OUTOFMEMORY;
+	else
+	{
+		m.p[0] = 0;
+		j->err = upd_http_get(UPD_API_URL, UPD_AGENT, L"application/vnd.github+json", 10000, sinkMem, &m);
+		if (!j->err && !upd_parse_release(m.p, &j->rel)) j->errStr = S_UPD_BADREPLY;
+		free(m.p);
+	}
+	finishJob(j);
+	return 0;
+}
+
+/* The thread of the download: SHA256SUMS.txt, then the setup, then its hash. A setup that is
+ * incomplete or does not match is deleted here, so it can never be run. */
+static DWORD WINAPI downloadThread(void* arg)
+{
+	UpdJob* j = (UpdJob*)arg;
+	wchar_t dir[MAX_PATH], name[128], url[1024];
+	char want[65], got[65];
+	MemSink m;
+
+	GetTempPathW(MAX_PATH, dir);
+	wcsncat(dir, L"WyrmholdUpdate", MAX_PATH - wcslen(dir) - 1);
+	CreateDirectoryW(dir, NULL);
+	MultiByteToWideChar(CP_UTF8, 0, j->rel.setupName, -1, name, 128);
+	_snwprintf(j->file, MAX_PATH, L"%ls\\%ls", dir, name);
+	j->file[MAX_PATH - 1] = 0;
+
+	m.cap = 1 << 16;
+	m.n = 0;
+	m.p = (char*)malloc(m.cap);
+	if (!m.p) { j->err = ERROR_OUTOFMEMORY; finishJob(j); return 0; }
+	m.p[0] = 0;
+	MultiByteToWideChar(CP_UTF8, 0, j->rel.sumsUrl, -1, url, 1024);
+	j->err = upd_http_get(url, UPD_AGENT, NULL, 30000, sinkMem, &m);
+	if (!j->err && !upd_hash_for(m.p, j->rel.setupName, want)) j->errStr = S_UPD_NOHASH;
+	free(m.p);
+
+	if (!j->err && !j->errStr)
+	{
+		FileSink s;
+		s.lastPct = -1;
+		s.lastMb = 0;
+		s.f = CreateFileW(j->file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (s.f == INVALID_HANDLE_VALUE) j->err = GetLastError();
+		else
+		{
+			MultiByteToWideChar(CP_UTF8, 0, j->rel.setupUrl, -1, url, 1024);
+			j->err = upd_http_get(url, UPD_AGENT, NULL, 60000, sinkFile, &s);
+			CloseHandle(s.f);
+			if (!j->err && (!upd_sha256_file(j->file, got) || strcmp(got, want))) j->errStr = S_UPD_BADHASH;
+			if (j->err || j->errStr) DeleteFileW(j->file);
+		}
+	}
+	finishJob(j);
+	return 0;
+}
+
+static void startUpdateJob(int stage, int interactive, const UpdRelease* rel)
+{
+	UpdJob* j = (UpdJob*)calloc(1, sizeof(UpdJob));
+	HANDLE t;
+
+	if (!j) return;
+	j->stage = stage;
+	j->interactive = interactive;
+	if (rel) j->rel = *rel;
+	gUpdBusy = 1;
+	if (stage == 0) gUpdCheck = j;
+	t = CreateThread(NULL, 0, stage ? downloadThread : checkThread, j, 0, NULL);
+	if (t) CloseHandle(t);
+	else { free(j); gUpdBusy = 0; gUpdDownloading = 0; gUpdCheck = NULL; }
+}
+
+/* One daily check for the automatic ones, stamped in the .ini. */
+static int dailyCheckDue(void)
+{
+	wchar_t buf[32];
+	long long last, now = (long long)_time64(NULL);
+
+	iniStr(L"UpdateCheck", buf, 32);
+	last = _wtoi64(buf);
+	return now - last >= 24 * 3600 || now < last;
+}
+
+static void checkUpdates(int interactive)
+{
+	wchar_t buf[32];
+
+	if (gUpdBusy)
+	{
+		/* the daily check is under way: asked for from the menu, it now answers as such */
+		if (interactive && gUpdCheck) { gUpdCheck->interactive = 1; setStatus(ST_PLAIN, T(S_UPD_CHECKING)); }
+		return;
+	}
+	if (!interactive && (!gAutoUpdate || !dailyCheckDue())) return;
+	_snwprintf(buf, 32, L"%lu", (unsigned long)_time64(NULL));    /* even if it fails (no network): */
+	buf[31] = 0;                                              /* at most one try a day */
+	iniSetStr(L"UpdateCheck", buf);
+	if (interactive) setStatus(ST_PLAIN, T(S_UPD_CHECKING));
+	startUpdateJob(0, interactive, NULL);
+}
+
+static void updateMessage(int fmt, const UpdJob* j)
+{
+	wchar_t why[256], msg[640];
+
+	if (j->errStr) lstrcpynW(why, T(j->errStr), 256);
+	else { _snwprintf(why, 256, T(S_UPD_NET), (unsigned long)j->err); why[255] = 0; }
+	_snwprintf(msg, 640, T(fmt), why);
+	msg[639] = 0;
+	MessageBoxW(hMain, msg, L"Wyrmhold", MB_OK | MB_ICONWARNING);
+}
+
+/* The one question: 2 = Update now, 1 = What's new, 0 = Later (or the dialog closed). */
+static int askUpdate(const wchar_t* tag)
+{
+	TASKDIALOGCONFIG tc;
+	TASKDIALOG_BUTTON b[3];
+	wchar_t head[256], body[1024];
+	int r = 0;
+
+	_snwprintf(head, 256, T(S_UPD_ASK_HEAD), tag);
+	head[255] = 0;
+	_snwprintf(body, 1024, T(S_UPD_ASK), APP_VERSION);
+	body[1023] = 0;
+	b[0].nButtonID = 102; b[0].pszButtonText = T(S_UPD_NOW);
+	b[1].nButtonID = 101; b[1].pszButtonText = T(S_UPD_NOTES);
+	b[2].nButtonID = 100; b[2].pszButtonText = T(S_UPD_LATER);
+
+	ZeroMemory(&tc, sizeof(tc));
+	tc.cbSize = sizeof(tc);
+	tc.hwndParent = hMain;
+	tc.hInstance = gInst;
+	tc.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
+	tc.pszWindowTitle = L"Wyrmhold";
+	tc.pszMainIcon = TD_INFORMATION_ICON;
+	tc.pszMainInstruction = head;
+	tc.pszContent = body;
+	tc.cButtons = 3;
+	tc.pButtons = b;
+	tc.nDefaultButton = 102;
+	if (FAILED(TaskDialogIndirect(&tc, &r, NULL, NULL))) return 0;
+	return r == 102 ? 2 : r == 101 ? 1 : 0;
+}
+
+static void offerPage(int fmt, const wchar_t* tag)
+{
+	wchar_t msg[640];
+
+	_snwprintf(msg, 640, T(fmt), tag, APP_VERSION);
+	msg[639] = 0;
+	if (MessageBoxW(hMain, msg, L"Wyrmhold", MB_YESNO | MB_ICONINFORMATION) == IDYES)
+		ShellExecuteW(hMain, L"open", UPD_PAGE, NULL, NULL, SW_SHOWNORMAL);
+}
+
+static void onUpdateProgress(int pct, ULONGLONG done)
+{
+	wchar_t amount[32], buf[256];
+
+	if (!gUpdDownloading) return;
+	if (pct >= 0) _snwprintf(amount, 32, L"%d %%", pct);
+	else          _snwprintf(amount, 32, L"%u MB", (unsigned)(done >> 20));
+	amount[31] = 0;
+	_snwprintf(buf, 256, T(S_UPD_DOWNLOADING), gUpdTag, amount);
+	buf[255] = 0;
+	setStatus(ST_PLAIN, buf);
+}
+
+static void onUpdateDone(UpdJob* j)
+{
+	gUpdBusy = 0;
+	gUpdCheck = NULL;
+
+	if (j->stage == 0)
+	{
+		wchar_t tag[64];
+		const wchar_t* bare = tag;
+
+		if (j->interactive) setStatus(ST_PLAIN, T(S_ST_READY));
+		if (j->err || j->errStr)
+		{
+			if (j->interactive) updateMessage(S_UPD_ERROR, j);
+			free(j);
+			return;
+		}
+		MultiByteToWideChar(CP_UTF8, 0, j->rel.tag, -1, tag, 64);
+		tag[63] = 0;
+		while (*bare == L'v' || *bare == L'V') bare++;
+		if (!upd_is_newer(tag, APP_VERSION))
+		{
+			if (j->interactive)
+			{
+				wchar_t msg[256];
+				_snwprintf(msg, 256, T(S_UPD_UPTODATE), APP_VERSION);
+				msg[255] = 0;
+				MessageBoxW(hMain, msg, L"Wyrmhold", MB_OK | MB_ICONINFORMATION);
+			}
+		}
+		else if (!upd_installed_copy()) offerPage(S_UPD_PORTABLE, bare);
+		else if (!j->rel.setupUrl[0] || !j->rel.sumsUrl[0]) offerPage(S_UPD_AVAILABLE, bare);   /* no setup or hashes */
+		else
+		{
+			int r = askUpdate(bare);
+			if (r == 1) ShellExecuteW(hMain, L"open", UPD_PAGE, NULL, NULL, SW_SHOWNORMAL);
+			else if (r == 2)
+			{
+				lstrcpynW(gUpdTag, bare, 64);
+				gUpdDownloading = 1;
+				onUpdateProgress(0, 0);
+				startUpdateJob(1, 1, &j->rel);
+			}
+		}
+		free(j);
+		return;
+	}
+
+	/* the download is over: run the verified setup, then close so that it can replace us */
+	gUpdDownloading = 0;
+	if (!j->err && !j->errStr)
+	{
+		SHELLEXECUTEINFOW sei;
+		wchar_t args[160];
+
+		_snwprintf(args, 160, L"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /WHWAITPID=%lu /WHRELAUNCH=1",
+		           (unsigned long)GetCurrentProcessId());
+		args[159] = 0;
+		ZeroMemory(&sei, sizeof(sei));
+		sei.cbSize = sizeof(sei);
+		sei.fMask = SEE_MASK_NOASYNC;
+		sei.hwnd = hMain;
+		sei.lpVerb = L"open";
+		sei.lpFile = j->file;
+		sei.lpParameters = args;
+		sei.nShow = SW_SHOWNORMAL;
+		if (ShellExecuteExW(&sei))
+		{
+			free(j);
+			DestroyWindow(hMain);
+			return;
+		}
+		j->err = GetLastError();                /* refused, e.g. the elevation prompt cancelled */
+	}
+	setStatus(ST_PLAIN, T(S_ST_READY));
+	updateMessage(S_UPD_FAILED, j);
+	free(j);
+}
+
 /* ------------------------------------------------------------------ reacting to the controls */
 
 /* A setting changed: the strength and the profile name follow at once, and a new set is
@@ -3148,6 +3881,7 @@ static void onCommand(HWND hwnd, int id, int code, HWND ctl)
 			if (c->bind) *c->bind = !*c->bind;
 			InvalidateRect(ctl, NULL, FALSE);
 			if (id != IDC_TG_CLEAR) onOptionsChanged(1);
+			else { gClearFromArg = 0; InvalidateRect(hClearTime, NULL, FALSE); }
 			return;
 		}
 		if (c->kind == K_SEG) { setMode(c->value); return; }
@@ -3217,6 +3951,12 @@ static void onCommand(HWND hwnd, int id, int code, HWND ctl)
 	case IDM_SAVE:     saveAs(hwnd);          return;
 	case IDM_HELP:     showHelp(hwnd);        return;
 	case IDM_ABOUT:    showAbout(hwnd);       return;
+	case IDM_UPDATE:   checkUpdates(1);       return;
+	case IDM_UPDATE_AUTO:
+		gAutoUpdate = !gAutoUpdate;
+		iniSetInt(L"CheckUpdates", gAutoUpdate);
+		buildMenu(hwnd);
+		return;
 	case IDM_LANG_EN:  setLanguage(LANG_EN);  return;
 	case IDM_LANG_JP:  setLanguage(LANG_JP);  return;
 	case IDM_LANG_ES:  setLanguage(LANG_ES);  return;
@@ -3242,6 +3982,16 @@ static void onCommand(HWND hwnd, int id, int code, HWND ctl)
 	{
 		gOpt.separator = id - IDM_SEP_0;
 		onOptionsChanged(1);
+		return;
+	}
+	if (id >= IDM_CLR_0 && id < IDM_CLR_0 + CLEAR_CHOICE_N)
+	{
+		/* a time picked: clearing is on, and the choice is the window's own (saved) */
+		gClearSecs = CLEAR_CHOICES[id - IDM_CLR_0];
+		gClearClip = 1;
+		gClearFromArg = 0;
+		InvalidateRect(hTgClear, NULL, FALSE);
+		InvalidateRect(hClearTime, NULL, FALSE);
 		return;
 	}
 }
@@ -3275,7 +4025,11 @@ static void saveSettings(void)
 	iniSetInt(L"PinNoRepeat", gPinNoRepeat);
 	iniSetInt(L"PinNoSequence", gOpt.noSequence);
 	iniSetChars(L"PinExclude", gPinExclude);
-	iniSetInt(L"ClearClipboard", gClearClip);
+	if (!gClearFromArg)                 /* /clearafter is for this session only */
+	{
+		iniSetInt(L"ClearClipboard", gClearClip);
+		iniSetInt(L"ClearSeconds", gClearSecs);
+	}
 
 	ZeroMemory(&wp, sizeof(wp));
 	wp.length = sizeof(wp);
@@ -3312,6 +4066,8 @@ static void loadSettings(void)
 	gOpt.noSequence     = iniInt(L"PinNoSequence", 1) != 0;
 	iniChars(L"PinExclude", gPinExclude);
 	gClearClip          = iniInt(L"ClearClipboard", 1) != 0;
+	gClearSecs          = clampInt(iniInt(L"ClearSeconds", CLIP_DEFAULT), CLIP_MIN, CLIP_MAX);
+	gAutoUpdate         = iniInt(L"CheckUpdates", 1) != 0;
 	gTheme              = clampInt(iniInt(L"Theme", 0), 0, 2);
 	gAccent             = clampInt(iniInt(L"Accent", 0), 0, ACCENT_COUNT - 1);
 	gLang               = clampInt(iniInt(L"Language", LANG_EN), 0, LANG_COUNT - 1);
@@ -3415,9 +4171,41 @@ static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		return 0;
 
 	case WM_GETMINMAXINFO:
-		((MINMAXINFO*)lp)->ptMinTrackSize.x = SC(MIN_W);
-		((MINMAXINFO*)lp)->ptMinTrackSize.y = SC(640);
+	{
+		/* the smallest client the layout handles (it wraps and scrolls), as a window size */
+		RECT r;
+		SetRect(&r, 0, 0, SC(MIN_W), SC(MIN_H));
+		AdjustWindowRectEx(&r, WS_OVERLAPPEDWINDOW, TRUE, 0);
+		((MINMAXINFO*)lp)->ptMinTrackSize.x = r.right - r.left;
+		((MINMAXINFO*)lp)->ptMinTrackSize.y = r.bottom - r.top;
 		return 0;
+	}
+
+	case WM_VSCROLL:
+	{
+		SCROLLINFO si;
+		int page = maxInt(SC(40), gClipBottom - SC(40));
+		si.cbSize = sizeof(si);
+		si.fMask = SIF_TRACKPOS;
+		GetScrollInfo(hwnd, SB_VERT, &si);
+		switch (LOWORD(wp))
+		{
+		case SB_LINEUP:        scrollTo(gScrollY - SC(40)); break;
+		case SB_LINEDOWN:      scrollTo(gScrollY + SC(40)); break;
+		case SB_PAGEUP:        scrollTo(gScrollY - page); break;
+		case SB_PAGEDOWN:      scrollTo(gScrollY + page); break;
+		case SB_TOP:           scrollTo(0); break;
+		case SB_BOTTOM:        scrollTo(gScrollMax); break;
+		case SB_THUMBTRACK:
+		case SB_THUMBPOSITION: scrollTo(si.nTrackPos); break;
+		}
+		return 0;
+	}
+
+	case WM_MOUSEWHEEL:
+		/* the wheel over anything but the list (which scrolls itself) moves the part above it */
+		if (gScrollMax > 0) { scrollTo(gScrollY - GET_WHEEL_DELTA_WPARAM(wp) * SC(48) / WHEEL_DELTA); return 0; }
+		break;
 
 	case WM_TIMER:
 		if (wp == TMR_CLIP) { clipTick(); return 0; }
@@ -3436,9 +4224,22 @@ static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		onCommand(hwnd, LOWORD(wp), HIWORD(wp), (HWND)lp);
 		return 0;
 
+	case WM_APP_UPDATE:
+		onUpdateDone((UpdJob*)lp);
+		return 0;
+
+	case WM_APP_PROGRESS:
+		onUpdateProgress((int)wp, (ULONGLONG)lp);
+		return 0;
+
+	case WM_ENDSESSION:
+		/* Windows is signing out or shutting down: WM_DESTROY may never come */
+		if (wp) wipeOnExit();
+		return 0;
+
 	case WM_DESTROY:
-		/* a password still waiting to be wiped goes now */
-		if (gClipLeft > 0) wipeOurClipboard();
+		/* a password still waiting to be wiped goes now, if it is still ours */
+		wipeOnExit();
 		saveSettings();
 		wipePasswords();
 		PostQuitMessage(0);
@@ -3602,6 +4403,313 @@ static int parseOptions(PwOptions* o, int* noRepeat, char* exclude, int* count, 
 	return any;
 }
 
+/* The value of /clearafter: "90" or "90s" seconds, "2m" minutes, "0" or "off" never.
+ * Returns the seconds (0 = never), or -1 when it is not understood. */
+static int parseDuration(const char* s)
+{
+	long v = 0;
+	int digits = 0;
+
+	if (!_stricmp(s, "off")) return 0;
+	while (*s >= '0' && *s <= '9')
+	{
+		v = v * 10 + (*s++ - '0');
+		if (v > 1000000) return -1;
+		digits++;
+	}
+	if (!digits) return -1;
+	if (*s == 'm' || *s == 'M') { v *= 60; s++; }
+	else if (*s == 's' || *s == 'S') s++;
+	return *s ? -1 : (int)v;
+}
+
+/* ------------------------------------------------------------------ self-test */
+
+/* wyrmhold.exe /selftest:<log> -- the clipboard wiping on the real clipboard (saved first and
+ * put back afterwards; the test copies are kept out of the clipboard history like any other),
+ * its settings in a throw-away .ini, and the pure functions of the update. It takes about five
+ * seconds and never touches the user's settings. Exit code: the number of failures. */
+
+typedef struct { UINT fmt; HGLOBAL h; } SavedFormat;
+static SavedFormat gSaved[64];
+static int gSavedN = 0;
+static int gTestFails = 0;
+static FILE* gTestLog;
+
+static void testCheck(int ok, const char* what)
+{
+	if (!ok) gTestFails++;
+	fprintf(gTestLog, "%-4s %s\r\n", ok ? "ok" : "BAD", what);
+	fflush(gTestLog);
+}
+
+/* formats whose data is a GDI object or private, not a block of memory that can be copied */
+static int notMemoryFormat(UINT f)
+{
+	return f == CF_BITMAP || f == CF_METAFILEPICT || f == CF_PALETTE || f == CF_ENHMETAFILE ||
+	       f == CF_OWNERDISPLAY || f == CF_DSPBITMAP || f == CF_DSPMETAFILEPICT || f == CF_DSPENHMETAFILE ||
+	       (f >= CF_PRIVATEFIRST && f <= CF_PRIVATELAST) || (f >= CF_GDIOBJFIRST && f <= CF_GDIOBJLAST);
+}
+
+/* A copy of every memory format on the clipboard (a bitmap is kept through its CF_DIB). */
+static void saveUserClipboard(void)
+{
+	UINT f = 0;
+
+	gSavedN = 0;
+	if (!openClipboardRetry()) return;
+	while ((f = EnumClipboardFormats(f)) != 0 && gSavedN < 64)
+	{
+		HANDLE h;
+		HGLOBAL copy;
+		SIZE_T n;
+		void *src, *dst;
+
+		if (notMemoryFormat(f) || (h = GetClipboardData(f)) == NULL || (n = GlobalSize(h)) == 0) continue;
+		if ((src = GlobalLock(h)) == NULL) continue;
+		copy = GlobalAlloc(GMEM_MOVEABLE, n);
+		if (copy && (dst = GlobalLock(copy)) != NULL)
+		{
+			memcpy(dst, src, n);
+			GlobalUnlock(copy);
+			gSaved[gSavedN].fmt = f;
+			gSaved[gSavedN++].h = copy;
+		}
+		else if (copy) GlobalFree(copy);
+		GlobalUnlock(h);
+	}
+	CloseClipboard();
+}
+
+static int restoreUserClipboard(void)
+{
+	int i, history = 0;
+
+	if (!openClipboardRetry())
+	{
+		for (i = 0; i < gSavedN; i++) GlobalFree(gSaved[i].h);
+		gSavedN = 0;
+		return 0;
+	}
+	EmptyClipboard();
+	for (i = 0; i < gSavedN; i++)
+	{
+		wchar_t name[64];
+		if (GetClipboardFormatNameW(gSaved[i].fmt, name, 64) && !lstrcmpiW(name, L"CanIncludeInClipboardHistory")) history = 1;
+		if (!SetClipboardData(gSaved[i].fmt, gSaved[i].h)) GlobalFree(gSaved[i].h);
+	}
+	/* the content went to the history when it was first copied: not a second time */
+	if (gSavedN && !history)
+	{
+		putDwordFormat(L"CanIncludeInClipboardHistory", 0);
+		putDwordFormat(L"CanUploadToCloudClipboard", 0);
+	}
+	CloseClipboard();
+	gSavedN = 0;
+	return 1;
+}
+
+/* A copy made by "another program": a second window of ours, without any marker formats. */
+static void otherCopies(HWND other, const wchar_t* text)
+{
+	size_t bytes = (wcslen(text) + 1) * sizeof(wchar_t);
+	HGLOBAL h;
+	int i;
+
+	for (i = 0; i < 10 && !OpenClipboard(other); i++) Sleep(20);
+	EmptyClipboard();
+	h = GlobalAlloc(GMEM_MOVEABLE, bytes);
+	if (h)
+	{
+		memcpy(GlobalLock(h), text, bytes);
+		GlobalUnlock(h);
+		if (!SetClipboardData(CF_UNICODETEXT, h)) GlobalFree(h);
+	}
+	CloseClipboard();
+}
+
+static int clipboardIs(const wchar_t* text)
+{
+	HANDLE h;
+	const wchar_t* p;
+	int same = 0;
+
+	if (!openClipboardRetry()) return 0;
+	h = GetClipboardData(CF_UNICODETEXT);
+	if (h && (p = (const wchar_t*)GlobalLock(h)) != NULL)
+	{
+		same = !wcscmp(p, text);
+		GlobalUnlock(h);
+	}
+	CloseClipboard();
+	return same;
+}
+
+static int clipboardHas(const wchar_t* formatName)
+{
+	UINT f = RegisterClipboardFormatW(formatName);
+	return f && IsClipboardFormatAvailable(f);
+}
+
+static LRESULT CALLBACK testProc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+	if (m == WM_TIMER && w == TMR_CLIP) { clipTick(); return 0; }
+	return DefWindowProcW(h, m, w, l);
+}
+
+static int selfTest(const wchar_t* logPath)
+{
+	wchar_t tmp[MAX_PATH], dir[MAX_PATH];
+	WNDCLASSW wc;
+	HWND other;
+	BYTE before[32];
+	int hadText;
+
+	gTestLog = logPath ? _wfopen(logPath, L"wb") : NULL;
+	if (!gTestLog) return 100;
+	fprintf(gTestLog, "Wyrmhold %ls self-test\r\n", APP_VERSION);
+
+	ZeroMemory(&wc, sizeof(wc));
+	wc.lpfnWndProc = testProc;
+	wc.hInstance = gInst;
+	wc.lpszClassName = L"WyrmholdTest";
+	RegisterClassW(&wc);
+	hMain = CreateWindowExW(0, L"WyrmholdTest", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, gInst, NULL);
+	other = CreateWindowExW(0, L"WyrmholdTest", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, gInst, NULL);
+
+	/* 1. settings, in a folder of their own that is deleted at the end */
+	GetTempPathW(MAX_PATH, tmp);
+	_snwprintf(dir, MAX_PATH, L"%lswyrmhold_selftest_%lu_%lu", tmp, (unsigned long)GetCurrentProcessId(), (unsigned long)GetTickCount());
+	dir[MAX_PATH - 1] = 0;
+	CreateDirectoryW(dir, NULL);
+	_snwprintf(gIni, MAX_PATH, L"%ls\\wyrmhold.ini", dir);
+	gIni[MAX_PATH - 1] = 0;
+	gNoSave = 0;
+
+	loadSettings();
+	testCheck(gClearClip == 1 && gClearSecs == 120, "settings: by default clearing is on, after 120 s (2 minutes)");
+	testCheck(gAutoUpdate == 1, "settings: by default the daily update check is on");
+	iniSetInt(L"ClearSeconds", 45);
+	iniSetInt(L"ClearClipboard", 0);
+	iniSetInt(L"CheckUpdates", 0);
+	loadSettings();
+	testCheck(gClearClip == 0 && gClearSecs == 45 && gAutoUpdate == 0, "settings: ClearClipboard=0, ClearSeconds=45, CheckUpdates=0 read back");
+	iniSetInt(L"ClearSeconds", 1);
+	loadSettings();
+	testCheck(gClearSecs == CLIP_MIN, "settings: ClearSeconds=1 is raised to 5");
+	iniSetInt(L"ClearSeconds", 999999);
+	loadSettings();
+	testCheck(gClearSecs == CLIP_MAX, "settings: ClearSeconds=999999 is lowered to 3600");
+
+	gClearFromArg = 1; gClearClip = 1; gClearSecs = 30;
+	saveSettings();
+	loadSettings();
+	testCheck(gClearClip == 0 && gClearSecs == CLIP_MAX, "settings: a /clearafter value is not saved");
+	gClearFromArg = 0; gClearClip = 1; gClearSecs = 300;
+	saveSettings();
+	loadSettings();
+	testCheck(gClearClip == 1 && gClearSecs == 300, "settings: a choice made in the window is saved");
+
+	testCheck(parseDuration("90") == 90 && parseDuration("45s") == 45 && parseDuration("2m") == 120 &&
+	          parseDuration("10M") == 600, "/clearafter: 90, 45s, 2m, 10M");
+	testCheck(parseDuration("0") == 0 && parseDuration("off") == 0, "/clearafter: 0 and off mean never");
+	testCheck(parseDuration("") == -1 && parseDuration("x") == -1 && parseDuration("5h") == -1 &&
+	          parseDuration("-5") == -1, "/clearafter: empty, x, 5h, -5 are refused");
+
+	/* 2. the clipboard: the user's content is saved first and put back at the end */
+	hadText = IsClipboardFormatAvailable(CF_UNICODETEXT);
+	{
+		/* only a hash of the user's text is kept, to check that it comes back */
+		HANDLE h;
+		const wchar_t* p;
+		hadText = hadText && openClipboardRetry();
+		if (hadText)
+		{
+			h = GetClipboardData(CF_UNICODETEXT);
+			p = h ? (const wchar_t*)GlobalLock(h) : NULL;
+			hadText = p && upd_sha256(p, wcslen(p) * sizeof(wchar_t), before);
+			if (p) GlobalUnlock(h);
+			CloseClipboard();
+		}
+	}
+	saveUserClipboard();
+
+	gClearClip = 1;
+	gClearSecs = 1;
+	testCheck(putClipboard(L"WH-SELFTEST-1") && clipboardIs(L"WH-SELFTEST-1"), "clipboard: copy");
+	testCheck(clipboardHas(L"ExcludeClipboardContentFromMonitorProcessing") && clipboardHas(L"CanIncludeInClipboardHistory") &&
+	          clipboardHas(L"CanUploadToCloudClipboard"), "clipboard: kept out of the history (Win+V), the cloud and monitors");
+	armClipWipe();
+	testCheck(gClipLeft == 1, "clipboard: the countdown starts with the time set");
+	pump(1700);
+	testCheck(CountClipboardFormats() == 0 && gClipLeft == 0, "clipboard: wiped by the timer when the time is up");
+
+	putClipboard(L"WH-SELFTEST-2");
+	armClipWipe();
+	otherCopies(other, L"WH-SELFTEST-OTHER");
+	pump(1700);
+	testCheck(clipboardIs(L"WH-SELFTEST-OTHER") && gClipLeft == 0, "clipboard: what another program copied afterwards is left alone");
+
+	putClipboard(L"WH-SELFTEST-3");
+	armClipWipe();
+	otherCopies(other, L"WH-SELFTEST-3");
+	pump(1700);
+	testCheck(CountClipboardFormats() == 0, "clipboard: exactly our text, put back by another program, is still wiped");
+
+	gClearSecs = CLIP_DEFAULT;
+	putClipboard(L"WH-SELFTEST-4");
+	armClipWipe();
+	testCheck(gClipLeft == CLIP_DEFAULT, "clipboard: 120 s to go");
+	wipeOnExit();
+	testCheck(CountClipboardFormats() == 0 && gClipLeft == 0, "clipboard: closing before the time is up wipes it at once");
+
+	putClipboard(L"WH-SELFTEST-5");
+	armClipWipe();
+	otherCopies(other, L"WH-SELFTEST-OTHER");
+	wipeOnExit();
+	testCheck(clipboardIs(L"WH-SELFTEST-OTHER"), "clipboard: closing leaves a later copy by another program alone");
+
+	gClearClip = 0;
+	putClipboard(L"WH-SELFTEST-6");
+	armClipWipe();
+	testCheck(gClipLeft == 0, "clipboard: with clearing off no countdown starts");
+	wipeOnExit();
+	testCheck(clipboardIs(L"WH-SELFTEST-6"), "clipboard: with clearing off a copy stays, also on exit");
+
+	testCheck(restoreUserClipboard(), "clipboard: the user's content is put back");
+	if (hadText)
+	{
+		HANDLE h;
+		const wchar_t* p;
+		BYTE after[32];
+		int same = 0;
+		if (openClipboardRetry())
+		{
+			h = GetClipboardData(CF_UNICODETEXT);
+			p = h ? (const wchar_t*)GlobalLock(h) : NULL;
+			same = p && upd_sha256(p, wcslen(p) * sizeof(wchar_t), after) && !memcmp(after, before, 32);
+			if (p) GlobalUnlock(h);
+			CloseClipboard();
+		}
+		testCheck(same, "clipboard: the user's text is back, unchanged");
+	}
+	forgetClipboard();
+
+	/* 3. the update's pure functions */
+	gTestFails += upd_selftest(gTestLog);
+
+	DeleteFileW(gIni);
+	RemoveDirectoryW(dir);
+	testCheck(GetFileAttributesW(dir) == INVALID_FILE_ATTRIBUTES, "the throw-away settings folder is gone");
+	DestroyWindow(other);
+	DestroyWindow(hMain);
+	hMain = NULL;
+
+	fprintf(gTestLog, gTestFails ? "FAILED: %d\r\n" : "ALL SELF-TESTS PASSED\r\n", gTestFails);
+	fclose(gTestLog);
+	return gTestFails;
+}
+
 /* ------------------------------------------------------------------ entry */
 
 static void readDpi(void)
@@ -3636,7 +4744,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	GpStartupInput gsi;
 	RECT want;
 	const char *outPath = NULL, *shotPath = NULL, *openWhat = NULL, *entPath = NULL;
-	int i, langArg = -1, ww, wh, wx, wy, rc = 0;
+	const char *testPath = NULL, *clearArg = NULL;
+	int i, langArg = -1, ww, wh, wx, wy, rc = 0, updated = 0, shotDpi = 0, areaW = 0, areaH = 0;
 
 	(void)prev; (void)cmdLine;
 
@@ -3659,7 +4768,15 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		else if (!_stricmp(a, "lang:en"))      langArg = LANG_EN;
 		else if (!_stricmp(a, "lang:jp"))      langArg = LANG_JP;
 		else if (!_stricmp(a, "lang:es"))      langArg = LANG_ES;
+		else if (!_strnicmp(a, "clearafter:", 11)) clearArg = a + 11;
+		else if (!_strnicmp(a, "selftest:", 9))    testPath = a + 9;
+		else if (!_stricmp(a, "updated"))      updated = 1;     /* started by the setup after an update */
+		else if (!_strnicmp(a, "shotdpi:", 8))  shotDpi = atoi(a + 8);
+		else if (!_strnicmp(a, "shotarea:", 9)) sscanf(a + 9, "%dx%d", &areaW, &areaH);
 	}
+
+	/* the self-test: no window, a throw-away .ini, the clipboard saved and put back */
+	if (testPath) return selfTest(widePathArg(L"selftest:"));
 
 	/* passwords (or their entropy) to a file, no window at all; without options they
 	 * use the standard profile, whatever the .ini says */
@@ -3684,6 +4801,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 
 	setAppId();
 	readDpi();
+	if (shotPath && shotDpi >= 96 && shotDpi <= 480) gDpi = shotDpi;   /* screenshots at another scale */
 	{
 		int t = gTheme, a = gAccent;
 		loadSettings();
@@ -3691,6 +4809,17 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		if (a) gAccent = a;
 	}
 	if (langArg >= 0) gLang = langArg;
+	if (clearArg)
+	{
+		/* for this session only: saveSettings leaves the .ini's choice alone */
+		int v = parseDuration(clearArg);
+		if (v >= 0)
+		{
+			gClearClip = v > 0;
+			if (v > 0) gClearSecs = clampInt(v, CLIP_MIN, CLIP_MAX);
+			gClearFromArg = 1;
+		}
+	}
 
 	/* a screenshot may ask for a kind of password or a profile */
 	if (shotPath)
@@ -3736,24 +4865,52 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	wc.hIcon = icBig;
 	RegisterClassW(&wc);
 
-	/* the default size is the client the design needs: five rows in the list */
-	SetRect(&want, 0, 0, SC(DESIGN_W), SC(BAND_H + 16 + SEG_H + 14 + CARD_OPT_H + 14 + LIST_HEAD + 5 * ROW_LH + 14 + STATUS_H));
+	/* the default size is the client the design needs: the whole band and five rows in the
+	 * list. It is measured before the controls exist: measuring only needs the fonts. */
+	gMeasure = 1;
+	SetRect(&want, 0, 0, SC(DESIGN_W), layoutTop(SC(DESIGN_W), 0, SC(BAND_FULL), -1) + SC(5 * ROW_LH + 8 + STATUS_H));
+	gMeasure = 0;
 	AdjustWindowRectEx(&want, WS_OVERLAPPEDWINDOW, TRUE, 0);
-	ww = iniInt(L"WndW", want.right - want.left);
-	wh = iniInt(L"WndH", want.bottom - want.top);
-	wx = iniInt(L"WndX", CW_USEDEFAULT);
-	wy = iniInt(L"WndY", CW_USEDEFAULT);
-	if (ww < SC(MIN_W) || wh < SC(640) || shotPath)
 	{
-		ww = want.right - want.left;
-		wh = want.bottom - want.top;
+		RECT minR;
+		SetRect(&minR, 0, 0, SC(MIN_W), SC(MIN_H));
+		AdjustWindowRectEx(&minR, WS_OVERLAPPEDWINDOW, TRUE, 0);
+		ww = iniInt(L"WndW", want.right - want.left);
+		wh = iniInt(L"WndH", want.bottom - want.top);
+		wx = iniInt(L"WndX", CW_USEDEFAULT);
+		wy = iniInt(L"WndY", CW_USEDEFAULT);
+		if (ww < minR.right - minR.left || wh < minR.bottom - minR.top || shotPath)
+		{
+			ww = want.right - want.left;
+			wh = want.bottom - want.top;
+		}
 	}
-	if (shotPath) wx = wy = 40;
-	else if (wx != CW_USEDEFAULT)
+	if (!shotPath && wx != CW_USEDEFAULT)
 	{
 		RECT saved;
 		SetRect(&saved, wx, wy, wx + ww, wy + wh);
 		if (!MonitorFromRect(&saved, MONITOR_DEFAULTTONULL)) wx = wy = CW_USEDEFAULT;
+	}
+	{
+		/* never larger than the work area of its screen (small screens, high scaling); a new
+		 * window is centred in it. /shotarea stands in for a screen when taking screenshots. */
+		RECT wa;
+		MONITORINFO mi;
+		POINT at;
+		mi.cbSize = sizeof(mi);
+		at.x = wx == CW_USEDEFAULT ? 0 : wx;
+		at.y = wx == CW_USEDEFAULT ? 0 : wy;
+		if (shotPath && areaW > 0 && areaH > 0) SetRect(&wa, 0, 0, areaW, areaH);
+		else if (GetMonitorInfoW(MonitorFromPoint(at, MONITOR_DEFAULTTOPRIMARY), &mi)) wa = mi.rcWork;
+		else SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
+		ww = minInt(ww, wa.right - wa.left);
+		wh = minInt(wh, wa.bottom - wa.top);
+		if (wx == CW_USEDEFAULT || shotPath)
+		{
+			wx = wa.left + (wa.right - wa.left - ww) / 2;
+			wy = wa.top + (wa.bottom - wa.top - wh) / 2;
+		}
+		if (shotPath) { wx += 40; wy += 40; }   /* a screenshot is drawn off the work area's corner */
 	}
 
 	hMain = CreateWindowExW(0, L"Wyrmhold", T(S_WINDOW_TITLE), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
@@ -3788,6 +4945,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 
 	ShowWindow(hMain, (iniInt(L"WndMax", 0) && show != SW_SHOWMINNOACTIVE) ? SW_SHOWMAXIMIZED : show);
 	UpdateWindow(hMain);
+	if (updated) setStatusF(ST_OK, S_UPD_UPDATED, APP_VERSION);
+	checkUpdates(0);                /* once a day, unless switched off */
 
 	while (GetMessageW(&msg, NULL, 0, 0) > 0)
 	{
@@ -3798,7 +4957,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		if (hAboutWnd && IsDialogMessageW(hAboutWnd, &msg)) continue;
 		if (hThemeWnd && IsDialogMessageW(hThemeWnd, &msg)) continue;
 		if (hHelpWnd && IsDialogMessageW(hHelpWnd, &msg)) continue;
-		if (IsDialogMessageW(hMain, &msg)) continue;
+		if (IsDialogMessageW(hMain, &msg)) { keepFocusInView(); continue; }
 		TranslateMessage(&msg);
 		DispatchMessageW(&msg);
 	}

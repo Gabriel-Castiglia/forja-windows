@@ -18,10 +18,17 @@ echo [1/2] resources
 windres -I src src\app.rc -O coff -o build\app.res
 if errorlevel 1 goto :failed
 
+rem  Some mingw-w64 builds (WinLibs) link a default-manifest.o of their own next to ours, and the
+rem  program ends up with two manifests. An empty default-manifest.o found first (-B) keeps only ours.
+if not exist build\nodefman mkdir build\nodefman
+echo.> build\nodefman\empty.c
+gcc -c build\nodefman\empty.c -o build\nodefman\default-manifest.o
+if errorlevel 1 goto :failed
+
 echo [2/2] program
-gcc -O2 -Wall -Wextra -mwindows -static -DUNICODE -D_UNICODE -Isrc ^
-    -o build\wyrmhold.exe src\wyrmhold.c src\pwgen.c build\app.res ^
-    -lcomctl32 -lcomdlg32 -lgdi32 -luxtheme -ldwmapi -lbcrypt -lshell32 -lgdiplus -lm
+gcc -B build\nodefman\ -O2 -Wall -Wextra -mwindows -static -DUNICODE -D_UNICODE -Isrc ^
+    -o build\wyrmhold.exe src\wyrmhold.c src\pwgen.c src\update.c build\app.res ^
+    -lcomctl32 -lcomdlg32 -lgdi32 -luxtheme -ldwmapi -lbcrypt -lshell32 -lgdiplus -lwinhttp -ladvapi32 -lm
 if errorlevel 1 goto :failed
 
 echo.

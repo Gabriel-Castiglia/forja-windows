@@ -77,8 +77,44 @@ Name: "{autodesktop}\Wyrmhold"; Filename: "{app}\wyrmhold.exe"; Comment: "{cm:Ta
 [Run]
 ; the program starts in the language chosen for the setup
 Filename: "{app}\wyrmhold.exe"; Parameters: "/lang:{code:AppLang}"; Description: "{cm:LaunchProgram,Wyrmhold}"; Flags: nowait postinstall skipifsilent
+; Help -> Check for updates installs in silence and asks for the program to come back
+Filename: "{app}\wyrmhold.exe"; Parameters: "/updated"; Flags: nowait runasoriginaluser; Check: WhRelaunch
 
 [Code]
+// Started by Wyrmhold itself (the "updates" part of src/wyrmhold.c): /WHWAITPID=<pid> waits for
+// that process to finish closing before any file is replaced; /WHRELAUNCH=1 starts the program
+// again when the files are in place. A silent setup keeps the previous install folder, mode,
+// language and tasks (UsePrevious* default to yes).
+function OpenProcess(Access: Cardinal; Inherit: Boolean; Pid: Cardinal): Cardinal;
+  external 'OpenProcess@kernel32.dll stdcall';
+function WaitForSingleObject(H: Cardinal; Ms: Cardinal): Cardinal;
+  external 'WaitForSingleObject@kernel32.dll stdcall';
+function CloseHandle(H: Cardinal): Boolean;
+  external 'CloseHandle@kernel32.dll stdcall';
+
+function InitializeSetup(): Boolean;
+var
+  Pid: Integer;
+  H: Cardinal;
+begin
+  Pid := StrToIntDef(ExpandConstant('{param:WHWAITPID|0}'), 0);
+  if Pid > 0 then
+  begin
+    H := OpenProcess($00100000, False, Pid);   // SYNCHRONIZE
+    if H <> 0 then
+    begin
+      WaitForSingleObject(H, 60000);
+      CloseHandle(H);
+    end;
+  end;
+  Result := True;
+end;
+
+function WhRelaunch(): Boolean;
+begin
+  Result := ExpandConstant('{param:WHRELAUNCH|0}') = '1';
+end;
+
 // The setup's language -> the program's /lang: value (the program remembers it).
 function AppLang(Param: String): String;
 begin

@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.1.0 — 2026-11-20
+
+- Clipboard: copies are now wiped after **2 minutes** by default (it was a fixed 30 seconds). A drop-down next to
+  "Clear clipboard after" offers 10 s, 30 s, 1, 2, 5 and 10 minutes; the switch still turns clearing off.
+  `wyrmhold.ini` keeps `ClearSeconds` (5 to 3600) beside `ClearClipboard`; `/clearafter:N[s|m]|off` sets it for
+  one session without saving it.
+- Clipboard: the copy is wiped only if the clipboard still holds exactly what Wyrmhold put there — the sequence
+  number, or else a SHA-256 of the text (the text itself is never kept). The same text put back by a clipboard
+  tool is still wiped; anything else copied afterwards is left alone. Closing the program, signing out or shutting
+  down before the time is up wipes it at once.
+- Updates that install themselves: Help → Check for updates, and a daily check (Help → Check for updates daily,
+  `CheckUpdates` in the .ini). One question (Update now, What's new, Later); then the setup is downloaded from the
+  GitHub release, checked against its `SHA256SUMS.txt` (deleted and never run if it does not match), run in silence
+  keeping the previous install options, and Wyrmhold opens again. A portable copy is offered the download page.
+- `wyrmhold.exe /selftest:<log>`: the clipboard wiping, its settings and the update's pure functions, with the
+  user's clipboard saved and put back and a throw-away .ini; run by `tools/run_checks.ps1`.
+  `tools/check_clipboard.ps1` now runs a portable copy in a temporary folder, so it never touches the real settings.
+- Help, tooltips, README and user guides describe both in English, Japanese and Spanish.
+- Small screens: a new window is sized to the screen's work area; rows that do not fit the width go
+  on to the next row (minimum width 560 logical pixels, was 760); in a low window the band slims
+  down or goes, rows and gaps tighten, and below that the part above the list scrolls while at
+  least three password rows stay in view. The status line is a window of its own.
+
 ## 2.0.2 — 2026-11-10
 
 - The setup creates the desktop shortcut unless you untick it (it was unticked by default).
