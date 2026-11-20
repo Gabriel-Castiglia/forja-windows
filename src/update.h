@@ -1,25 +1,25 @@
 /**
   update.h
-  Wyrmhold: strong passwords, passphrases and PINs made on your computer.
+  Forja: strong passwords, passphrases and PINs made on your computer.
 
   Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
   Date: November 20, 2026
   SPDX-License-Identifier: GPL-2.0-only
 
   Updates that install themselves: the parts that do not touch the window. The flow (one
-  question, download, checksum, silent setup, reopen) lives in wyrmhold.c; this file has the
+  question, download, checksum, silent setup, reopen) lives in forja.c; this file has the
   pure functions it relies on, the HTTPS client (WinHTTP), SHA-256 (BCrypt) and the test of
   whether this copy is the installed one or a portable one.
 **/
 
-#ifndef WYRMHOLD_UPDATE_H
-#define WYRMHOLD_UPDATE_H
+#ifndef FORJA_UPDATE_H
+#define FORJA_UPDATE_H
 
 #include <windows.h>
 #include <stdio.h>
 
-#define UPD_API_URL   L"https://api.github.com/repos/Gabriel-Castiglia/wyrmhold-windows/releases/latest"
-#define UPD_SETUP_PREFIX "Wyrmhold-Setup-"
+#define UPD_API_URL   L"https://api.github.com/repos/Gabriel-Castiglia/forja-windows/releases/latest"
+#define UPD_SETUP_PREFIX "Forja-Setup-"
 #define UPD_SUMS_NAME    "SHA256SUMS.txt"
 
 /* What the latest release offers. Empty strings for what it lacks. */

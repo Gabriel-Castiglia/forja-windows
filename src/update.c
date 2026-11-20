@@ -1,6 +1,6 @@
 /**
   update.c
-  Wyrmhold: strong passwords, passphrases and PINs made on your computer.
+  Forja: strong passwords, passphrases and PINs made on your computer.
 
   Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
   Date: November 20, 2026
@@ -22,8 +22,8 @@
 #define WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY 4
 #endif
 
-/* the AppId of installer/Wyrmhold.iss, as the setup writes it under Uninstall */
-#define UPD_UNINSTALL_KEY L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{0B42F4DD-81B9-4012-A29C-7DAE09A1DA5A}_is1"
+/* the AppId of installer/Forja.iss, as the setup writes it under Uninstall */
+#define UPD_UNINSTALL_KEY L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{AA7E8B36-E890-4F08-8A5E-C161BE196A52}_is1"
 
 /* ------------------------------------------------------------------ versions */
 
@@ -343,16 +343,16 @@ static void expect(FILE* log, int ok, const char* what)
 int upd_selftest(FILE* log)
 {
 	static const char sums[] =
-		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  Wyrmhold-Setup-9.9.9.exe\r\n"
-		"FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210 *wyrmhold-portable.zip\n"
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  Forja-Setup-9.9.9.exe\r\n"
+		"FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210 *forja-portable.zip\n"
 		"short  Other.exe\n"
 		"  1111111111111111111111111111111111111111111111111111111111111111\tTabbed.exe  \n";
 	static const char json[] =
 		"{\"url\":\"https://api.github.com/x\",\"html_url\":\"https://github.com/o/r/releases/tag/v9.9.9\","
 		"\"tag_name\": \"v9.9.9\",\"assets\":[{\"name\":\"SHA256SUMS.txt\",\"browser_download_url\":"
-		"\"https://github.com/o/r/releases/download/v9.9.9/SHA256SUMS.txt\"},{\"name\":\"Wyrmhold-Setup-9.9.9.exe\","
-		"\"browser_download_url\": \"https://github.com/o/r/releases/download/v9.9.9/Wyrmhold-Setup-9.9.9.exe\"},"
-		"{\"name\":\"bad\",\"browser_download_url\":\"https://github.com/o/r/releases/download/v9.9.9/Wyrmhold-Setup-..%5c.exe\"}]}";
+		"\"https://github.com/o/r/releases/download/v9.9.9/SHA256SUMS.txt\"},{\"name\":\"Forja-Setup-9.9.9.exe\","
+		"\"browser_download_url\": \"https://github.com/o/r/releases/download/v9.9.9/Forja-Setup-9.9.9.exe\"},"
+		"{\"name\":\"bad\",\"browser_download_url\":\"https://github.com/o/r/releases/download/v9.9.9/Forja-Setup-..%5c.exe\"}]}";
 	static const BYTE abc[32] = { 0xba,0x78,0x16,0xbf,0x8f,0x01,0xcf,0xea,0x41,0x41,0x40,0xde,0x5d,0xae,0x22,0x23,
 	                              0xb0,0x03,0x61,0xa3,0x96,0x17,0x7a,0x9c,0xb4,0x10,0xff,0x61,0xf2,0x00,0x15,0xad };
 	char h[65];
@@ -372,18 +372,18 @@ int upd_selftest(FILE* log)
 	expect(log, !upd_is_newer(L"", L"2.1.0"), "IsNewer: an empty tag is not newer");
 	expect(log, !upd_is_newer(L"1.2.3.4.5", L"1.0"), "IsNewer: five parts are not a version");
 
-	expect(log, upd_hash_for(sums, "Wyrmhold-Setup-9.9.9.exe", h) &&
+	expect(log, upd_hash_for(sums, "Forja-Setup-9.9.9.exe", h) &&
 	            !strcmp(h, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"), "HashFor: \"hash  name\"");
-	expect(log, upd_hash_for(sums, "WYRMHOLD-PORTABLE.ZIP", h) &&
+	expect(log, upd_hash_for(sums, "FORJA-PORTABLE.ZIP", h) &&
 	            !strcmp(h, "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"), "HashFor: \"hash *name\", any case, lowercase out");
 	expect(log, upd_hash_for(sums, "Tabbed.exe", h) && h[0] == '1', "HashFor: tab separator and spaces around the line");
 	expect(log, !upd_hash_for(sums, "Other.exe", h), "HashFor: a short hash is not a hash");
-	expect(log, !upd_hash_for(sums, "Wyrmhold-Setup-9.9.exe", h), "HashFor: a missing file has no hash");
+	expect(log, !upd_hash_for(sums, "Forja-Setup-9.9.exe", h), "HashFor: a missing file has no hash");
 	expect(log, !upd_hash_for("", "x", h), "HashFor: empty file");
 
 	expect(log, upd_parse_release(json, &r) && !strcmp(r.tag, "v9.9.9"), "release JSON: tag_name");
-	expect(log, !strcmp(r.setupName, "Wyrmhold-Setup-9.9.9.exe") &&
-	            !strcmp(r.setupUrl, "https://github.com/o/r/releases/download/v9.9.9/Wyrmhold-Setup-9.9.9.exe"),
+	expect(log, !strcmp(r.setupName, "Forja-Setup-9.9.9.exe") &&
+	            !strcmp(r.setupUrl, "https://github.com/o/r/releases/download/v9.9.9/Forja-Setup-9.9.9.exe"),
 	            "release JSON: the setup asset (an unsafe file name is ignored)");
 	expect(log, !strcmp(r.sumsUrl, "https://github.com/o/r/releases/download/v9.9.9/SHA256SUMS.txt"), "release JSON: SHA256SUMS.txt");
 	expect(log, !upd_parse_release("{\"message\":\"Not Found\"}", &r), "release JSON: no tag, no release");

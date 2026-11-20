@@ -1,16 +1,16 @@
 /**
-  Wyrmhold -- the window.
+  Forja -- the window.
   Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
   Date: November 9, 2026
   SPDX-License-Identifier: GPL-2.0-only
 
   A Win32 front end for the engine in pwgen.h. One portable, statically linked executable:
   installed with its setup, or run portable. The settings it remembers go to
-  %APPDATA%\Wyrmhold\wyrmhold.ini -- or, when a wyrmhold.ini sits beside the executable,
+  %APPDATA%\Forja\forja.ini -- or, when a forja.ini sits beside the executable,
   to that one (portable use).
 
-  The name: "wyrm" is the Old English word for dragon, "hold" a stronghold. A wyrmhold is
-  the dragon's keep -- where a dragon guards its hoard, as the program guards passwords.
+  The name: a forja (Spanish for forge) is where metal takes shape under the hammer, on the anvil,
+  as each password here takes shape from pure chance. Until version 2.1 it was called Wyrmhold.
 
   What the window does:
     - three kinds of password -- characters, passphrase, PIN -- chosen with a segmented
@@ -54,14 +54,14 @@
     - a window cannot be driven from another process reliably (UIPI filters WM_GETTEXT),
       so the command line does everything a test needs:
 
-        wyrmhold.exe [options] [/out:<file> | /entropy:<file> | /shot:<file.bmp>]
+        forja.exe [options] [/out:<file> | /entropy:<file> | /shot:<file.bmp>]
           options: /mode:chars|words|pin  /len:N  /words:N  /count:N  /classes:[l][u][d][s]
                    /symbols:basic|all|min|custom:<chars>  /exclude:<chars>  /ambiguous
                    /norepeat  /startletter  /sep:hyphen|space|dot|underscore|none|digit
                    /nocap  /nonumber  /allowruns  /preset:N
           window:  /theme:light|dark  /accent:N  /lang:en|jp|es  /open:help|about|theme
                    /clearafter:N[s|m]|off
-        wyrmhold.exe /selftest:<log>
+        forja.exe /selftest:<log>
 
       /out writes the passwords (count up to 100000) and exits without a window; without
       options they use the standard profile. /entropy writes "bits pool check" and exits.
@@ -101,7 +101,7 @@
 #define APP_DATE      WIDEN(WH_DATE_STR)
 #define APP_REPO      WIDEN(WH_REPO_STR)
 #define APP_AUTHOR    L"Gabriel Castiglia"
-#define APP_AUMID     L"Castiglia.Wyrmhold"
+#define APP_AUMID     L"Castiglia.Forja"
 #define INI_SECTION   L"settings"
 
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
@@ -368,8 +368,8 @@ static void layout(void);
 
 /* ------------------------------------------------------------------ settings */
 
-/* wyrmhold.ini beside the executable when one is there (portable use), otherwise
- * %APPDATA%\Wyrmhold\wyrmhold.ini -- the program folder of an installed copy cannot be
+/* forja.ini beside the executable when one is there (portable use), otherwise
+ * %APPDATA%\Forja\forja.ini -- the program folder of an installed copy cannot be
  * written. Writing may still fail; then the program simply starts with the defaults. */
 
 static void iniPath(void)
@@ -378,17 +378,32 @@ static void iniPath(void)
 	wchar_t dir[MAX_PATH];
 	DWORD n;
 
+	wchar_t old[MAX_PATH];
+
 	GetModuleFileNameW(NULL, gIni, MAX_PATH);
 	slash = wcsrchr(gIni, L'\\');
-	if (slash && (size_t)(slash - gIni) + 14 < MAX_PATH) wcscpy(slash + 1, L"wyrmhold.ini");
+	if (slash && (size_t)(slash - gIni) + 14 < MAX_PATH)
+	{
+		/* a portable copy that still has the settings of Wyrmhold (this program's name up to 2.1) */
+		wcscpy(slash + 1, L"wyrm" L"hold.ini");
+		lstrcpynW(old, gIni, MAX_PATH);
+		wcscpy(slash + 1, L"forja.ini");
+		if (GetFileAttributesW(gIni) == INVALID_FILE_ATTRIBUTES && GetFileAttributesW(old) != INVALID_FILE_ATTRIBUTES)
+			CopyFileW(old, gIni, TRUE);
+	}
 	if (GetFileAttributesW(gIni) != INVALID_FILE_ATTRIBUTES) return;
 
 	n = GetEnvironmentVariableW(L"APPDATA", dir, MAX_PATH);
 	if (n == 0 || n + 24 >= MAX_PATH) return;           /* no profile: stay beside the exe */
-	wcscat(dir, L"\\Wyrmhold");
+	_snwprintf(old, MAX_PATH, L"%ls\\Wyrm" L"hold\\wyrm" L"hold.ini", dir);
+	old[MAX_PATH - 1] = 0;
+	wcscat(dir, L"\\Forja");
 	CreateDirectoryW(dir, NULL);
-	_snwprintf(gIni, MAX_PATH, L"%ls\\wyrmhold.ini", dir);
+	_snwprintf(gIni, MAX_PATH, L"%ls\\forja.ini", dir);
 	gIni[MAX_PATH - 1] = 0;
+	/* the first time: the settings of Wyrmhold, this program's name up to 2.1, come over */
+	if (GetFileAttributesW(gIni) == INVALID_FILE_ATTRIBUTES && GetFileAttributesW(old) != INVALID_FILE_ATTRIBUTES)
+		CopyFileW(old, gIni, TRUE);
 }
 
 static int iniInt(const wchar_t* key, int def)
@@ -609,7 +624,7 @@ static void applyTheme(HWND hwnd)
 
 /* ------------------------------------------------------------------ the icon, in the accent */
 
-/* The icon: the engraving (dragon and tower) laid on a rounded tile of the accent's colour.
+/* The icon: the engraving (anvil and hammers) laid on a rounded tile of the accent's colour.
  * The drawing comes without the tile as resource IDR_ICONLAYER (tools/make_icon.py): 256 x 256
  * pixels of T, K, R, G, B, where the pixel is rgb = RGB + tile * K / 255 with alpha T,
  * premultiplied. Here it is coloured, reduced to the size asked by averaging the area each
@@ -2268,14 +2283,14 @@ static void buildControls(void)
 	wc.lpfnWndProc = sliderProc;
 	wc.hInstance = gInst;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.lpszClassName = L"WyrmholdSlider";
+	wc.lpszClassName = L"ForjaSlider";
 	RegisterClassW(&wc);
 
 	for (i = 0; i < 3; i++)
 		hSeg[i] = mkButton(hMain, IDC_SEG_CHARS + i, K_SEG, S_MODE_CHARS + i, NULL, PW_CHARS + i, G_NONE);
 	hProfile = mkButton(hMain, IDC_PROFILE, K_DROP, -1, NULL, 0, G_NONE);
 
-	hSlider = CreateWindowExW(0, L"WyrmholdSlider", L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | WS_TABSTOP,
+	hSlider = CreateWindowExW(0, L"ForjaSlider", L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | WS_TABSTOP,
 	                          0, 0, 10, 10, hMain, (HMENU)(INT_PTR)IDC_SLIDER, gInst, NULL);
 	hLen = mkEdit(IDC_LEN, 3, ES_NUMBER | ES_CENTER);
 	hCntDec = mkButton(hMain, IDC_CNT_DEC, K_STEP, -1, NULL, 0, G_MINUS);
@@ -2321,9 +2336,9 @@ static void buildControls(void)
 		sc.lpfnWndProc = statusProc;
 		sc.hInstance = gInst;
 		sc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		sc.lpszClassName = L"WyrmholdStatus";
+		sc.lpszClassName = L"ForjaStatus";
 		RegisterClassW(&sc);
-		hStatus = CreateWindowExW(0, L"WyrmholdStatus", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+		hStatus = CreateWindowExW(0, L"ForjaStatus", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
 		                          0, 0, 10, 10, hMain, (HMENU)(INT_PTR)IDC_STATUS, gInst, NULL);
 	}
 
@@ -3069,14 +3084,14 @@ static void showHelp(HWND owner)
 		wc.lpfnWndProc = helpProc;
 		wc.hInstance = gInst;
 		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wc.lpszClassName = L"WyrmholdHelp";
+		wc.lpszClassName = L"ForjaHelp";
 		RegisterClassW(&wc);
 		registered = 1;
 	}
 
 	gHelpScroll = 0;
 	GetWindowRect(owner, &r);
-	hHelpWnd = CreateWindowExW(0, L"WyrmholdHelp", T(S_HELP_TITLE), WS_OVERLAPPEDWINDOW | WS_VSCROLL,
+	hHelpWnd = CreateWindowExW(0, L"ForjaHelp", T(S_HELP_TITLE), WS_OVERLAPPEDWINDOW | WS_VSCROLL,
 	                           r.left + SC(40), r.top + SC(30), SC(700), SC(660), owner, NULL, gInst, NULL);
 	SendMessageW(hHelpWnd, WM_SETICON, ICON_BIG, (LPARAM)icBig);
 	SendMessageW(hHelpWnd, WM_SETICON, ICON_SMALL, (LPARAM)icSmall);
@@ -3215,7 +3230,7 @@ static void showAbout(HWND owner)
 		wc.lpfnWndProc = aboutProc;
 		wc.hInstance = gInst;
 		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wc.lpszClassName = L"WyrmholdAbout";
+		wc.lpszClassName = L"ForjaAbout";
 		RegisterClassW(&wc);
 		registered = 1;
 	}
@@ -3225,7 +3240,7 @@ static void showAbout(HWND owner)
 	AdjustWindowRectEx(&want, WS_POPUPWINDOW | WS_CAPTION, FALSE, WS_EX_DLGMODALFRAME);
 
 	GetWindowRect(owner, &r);
-	hAboutWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"WyrmholdAbout", T(S_ABOUT_TITLE),
+	hAboutWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"ForjaAbout", T(S_ABOUT_TITLE),
 	                            WS_POPUPWINDOW | WS_CAPTION,
 	                            r.left + ((r.right - r.left) - (want.right - want.left)) / 2,
 	                            r.top + ((r.bottom - r.top) - (want.bottom - want.top)) / 3,
@@ -3365,7 +3380,7 @@ static void showTheme(HWND owner)
 		wc.lpfnWndProc = themeProc;
 		wc.hInstance = gInst;
 		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wc.lpszClassName = L"WyrmholdTheme";
+		wc.lpszClassName = L"ForjaTheme";
 		RegisterClassW(&wc);
 		registered = 1;
 	}
@@ -3375,7 +3390,7 @@ static void showTheme(HWND owner)
 	SetRect(&want, 0, 0, SC(cw), SC(ch));
 	AdjustWindowRectEx(&want, WS_POPUPWINDOW | WS_CAPTION, FALSE, WS_EX_DLGMODALFRAME);
 	GetWindowRect(owner, &r);
-	hThemeWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"WyrmholdTheme", T(S_THEME_TITLE),
+	hThemeWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"ForjaTheme", T(S_THEME_TITLE),
 	                            WS_POPUPWINDOW | WS_CAPTION,
 	                            r.left + ((r.right - r.left) - (want.right - want.left)) / 2,
 	                            r.top + ((r.bottom - r.top) - (want.bottom - want.top)) / 3,
@@ -3490,11 +3505,11 @@ static void setLanguage(int lang)
  * is downloaded and checked against the release's SHA256SUMS.txt (a file that does not match
  * is deleted, never run); the window closes (a copy waiting to be wiped goes, as on any exit);
  * the setup runs in silence keeping the install options, waits for this process to be gone
- * (/WHWAITPID) and starts the program again (/WHRELAUNCH, see installer/Wyrmhold.iss). A
+ * (/WHWAITPID) and starts the program again (/WHRELAUNCH, see installer/Forja.iss). A
  * portable copy cannot be installed over: it is offered the download page. The network work
  * runs on a thread of its own, which reports through WM_APP_UPDATE and WM_APP_PROGRESS. */
 
-#define UPD_AGENT     L"Wyrmhold/" APP_VERSION
+#define UPD_AGENT     L"Forja/" APP_VERSION
 #define UPD_PAGE      L"https://" APP_REPO L"/releases/latest"
 
 typedef struct UpdJob {
@@ -3577,7 +3592,7 @@ static DWORD WINAPI downloadThread(void* arg)
 	MemSink m;
 
 	GetTempPathW(MAX_PATH, dir);
-	wcsncat(dir, L"WyrmholdUpdate", MAX_PATH - wcslen(dir) - 1);
+	wcsncat(dir, L"ForjaUpdate", MAX_PATH - wcslen(dir) - 1);
 	CreateDirectoryW(dir, NULL);
 	MultiByteToWideChar(CP_UTF8, 0, j->rel.setupName, -1, name, 128);
 	_snwprintf(j->file, MAX_PATH, L"%ls\\%ls", dir, name);
@@ -3666,7 +3681,7 @@ static void updateMessage(int fmt, const UpdJob* j)
 	else { _snwprintf(why, 256, T(S_UPD_NET), (unsigned long)j->err); why[255] = 0; }
 	_snwprintf(msg, 640, T(fmt), why);
 	msg[639] = 0;
-	MessageBoxW(hMain, msg, L"Wyrmhold", MB_OK | MB_ICONWARNING);
+	MessageBoxW(hMain, msg, L"Forja", MB_OK | MB_ICONWARNING);
 }
 
 /* The one question: 2 = Update now, 1 = What's new, 0 = Later (or the dialog closed). */
@@ -3690,7 +3705,7 @@ static int askUpdate(const wchar_t* tag)
 	tc.hwndParent = hMain;
 	tc.hInstance = gInst;
 	tc.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
-	tc.pszWindowTitle = L"Wyrmhold";
+	tc.pszWindowTitle = L"Forja";
 	tc.pszMainIcon = TD_INFORMATION_ICON;
 	tc.pszMainInstruction = head;
 	tc.pszContent = body;
@@ -3707,7 +3722,7 @@ static void offerPage(int fmt, const wchar_t* tag)
 
 	_snwprintf(msg, 640, T(fmt), tag, APP_VERSION);
 	msg[639] = 0;
-	if (MessageBoxW(hMain, msg, L"Wyrmhold", MB_YESNO | MB_ICONINFORMATION) == IDYES)
+	if (MessageBoxW(hMain, msg, L"Forja", MB_YESNO | MB_ICONINFORMATION) == IDYES)
 		ShellExecuteW(hMain, L"open", UPD_PAGE, NULL, NULL, SW_SHOWNORMAL);
 }
 
@@ -3751,7 +3766,7 @@ static void onUpdateDone(UpdJob* j)
 				wchar_t msg[256];
 				_snwprintf(msg, 256, T(S_UPD_UPTODATE), APP_VERSION);
 				msg[255] = 0;
-				MessageBoxW(hMain, msg, L"Wyrmhold", MB_OK | MB_ICONINFORMATION);
+				MessageBoxW(hMain, msg, L"Forja", MB_OK | MB_ICONINFORMATION);
 			}
 		}
 		else if (!upd_installed_copy()) offerPage(S_UPD_PORTABLE, bare);
@@ -4425,7 +4440,7 @@ static int parseDuration(const char* s)
 
 /* ------------------------------------------------------------------ self-test */
 
-/* wyrmhold.exe /selftest:<log> -- the clipboard wiping on the real clipboard (saved first and
+/* forja.exe /selftest:<log> -- the clipboard wiping on the real clipboard (saved first and
  * put back afterwards; the test copies are kept out of the clipboard history like any other),
  * its settings in a throw-away .ini, and the pure functions of the update. It takes about five
  * seconds and never touches the user's settings. Exit code: the number of failures. */
@@ -4567,22 +4582,22 @@ static int selfTest(const wchar_t* logPath)
 
 	gTestLog = logPath ? _wfopen(logPath, L"wb") : NULL;
 	if (!gTestLog) return 100;
-	fprintf(gTestLog, "Wyrmhold %ls self-test\r\n", APP_VERSION);
+	fprintf(gTestLog, "Forja %ls self-test\r\n", APP_VERSION);
 
 	ZeroMemory(&wc, sizeof(wc));
 	wc.lpfnWndProc = testProc;
 	wc.hInstance = gInst;
-	wc.lpszClassName = L"WyrmholdTest";
+	wc.lpszClassName = L"ForjaTest";
 	RegisterClassW(&wc);
-	hMain = CreateWindowExW(0, L"WyrmholdTest", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, gInst, NULL);
-	other = CreateWindowExW(0, L"WyrmholdTest", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, gInst, NULL);
+	hMain = CreateWindowExW(0, L"ForjaTest", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, gInst, NULL);
+	other = CreateWindowExW(0, L"ForjaTest", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, gInst, NULL);
 
 	/* 1. settings, in a folder of their own that is deleted at the end */
 	GetTempPathW(MAX_PATH, tmp);
-	_snwprintf(dir, MAX_PATH, L"%lswyrmhold_selftest_%lu_%lu", tmp, (unsigned long)GetCurrentProcessId(), (unsigned long)GetTickCount());
+	_snwprintf(dir, MAX_PATH, L"%lsforja_selftest_%lu_%lu", tmp, (unsigned long)GetCurrentProcessId(), (unsigned long)GetTickCount());
 	dir[MAX_PATH - 1] = 0;
 	CreateDirectoryW(dir, NULL);
-	_snwprintf(gIni, MAX_PATH, L"%ls\\wyrmhold.ini", dir);
+	_snwprintf(gIni, MAX_PATH, L"%ls\\forja.ini", dir);
 	gIni[MAX_PATH - 1] = 0;
 	gNoSave = 0;
 
@@ -4861,7 +4876,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	wc.lpfnWndProc = wndProc;
 	wc.hInstance = inst;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.lpszClassName = L"Wyrmhold";
+	wc.lpszClassName = L"Forja";
 	wc.hIcon = icBig;
 	RegisterClassW(&wc);
 
@@ -4913,7 +4928,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		if (shotPath) { wx += 40; wy += 40; }   /* a screenshot is drawn off the work area's corner */
 	}
 
-	hMain = CreateWindowExW(0, L"Wyrmhold", T(S_WINDOW_TITLE), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+	hMain = CreateWindowExW(0, L"Forja", T(S_WINDOW_TITLE), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
 	                        wx, wy, ww, wh, NULL, NULL, inst, NULL);
 
 	buildControls();

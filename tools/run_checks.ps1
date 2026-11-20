@@ -1,4 +1,4 @@
-# Wyrmhold -- the engine checks, run through the command line (/out), and the self-test.
+# Forja -- the engine checks, run through the command line (/out), and the self-test.
 # Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 # Date: November 9, 2026
 # SPDX-License-Identifier: GPL-2.0-only
@@ -9,7 +9,7 @@
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$exe  = Join-Path $root 'build\wyrmhold.exe'
+$exe  = Join-Path $root 'build\forja.exe'
 $chk  = Join-Path $PSScriptRoot 'check_passwords.py'
 $tmp  = Join-Path ([IO.Path]::GetTempPath()) ('rpg_checks_' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $tmp | Out-Null

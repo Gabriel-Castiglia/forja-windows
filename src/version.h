@@ -1,6 +1,6 @@
 /**
   version.h
-  Wyrmhold: strong passwords, passphrases and PINs made on your computer.
+  Forja: strong passwords, passphrases and PINs made on your computer.
 
   Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
   Date: November 10, 2026
@@ -11,14 +11,14 @@
   tools/audit_sources.py checks that the numbers and the string agree.
 **/
 
-#ifndef WYRMHOLD_VERSION_H
-#define WYRMHOLD_VERSION_H
+#ifndef FORJA_VERSION_H
+#define FORJA_VERSION_H
 
-#define WH_VER_MAJOR    2
-#define WH_VER_MINOR    1
-#define WH_VER_PATCH    1
-#define WH_VERSION_STR  "2.1.1"
+#define WH_VER_MAJOR    3
+#define WH_VER_MINOR    0
+#define WH_VER_PATCH    0
+#define WH_VERSION_STR  "3.0.0"
 #define WH_DATE_STR     "2026-11-20"
-#define WH_REPO_STR     "github.com/Gabriel-Castiglia/wyrmhold-windows"
+#define WH_REPO_STR     "github.com/Gabriel-Castiglia/forja-windows"
 
 #endif

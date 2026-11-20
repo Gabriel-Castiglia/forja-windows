@@ -1,10 +1,10 @@
 """
-Wyrmhold -- the setup wizard's pictures (installer/wizard.bmp, installer/wizard-small.bmp).
+Forja -- the setup wizard's pictures (installer/wizard.bmp, installer/wizard-small.bmp).
 Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 Date: November 10, 2026
 SPDX-License-Identifier: GPL-2.0-only
 
-The side panel: the icon's engraving on the default black, a soft glow of the dragon's fire
+The side panel: the icon's engraving on the default black, a soft glow of the forge's fire
 behind it, the name and a line in the three languages' common script (Latin). The small
 picture at the top right of the inner pages: the icon. Both at twice the base size (Inno
 Setup scales them down on ordinary screens and keeps them sharp on high-DPI ones).
@@ -49,8 +49,8 @@ panel.alpha_composite(shadow)
 panel.alpha_composite(ic, ((W - 232) // 2, 150))
 
 d = ImageDraw.Draw(panel)
-for text, f, yy, col in (("Wyrmhold", font("segoeuib.ttf", 50), 410, (255, 255, 255)),
-                         ("the dragon's keep", font("segoeuii.ttf", 21), 492, (240, 196, 120))):
+for text, f, yy, col in (("Forja", font("segoeuib.ttf", 50), 410, (255, 255, 255)),
+                         ("passwords made by chance", font("segoeuii.ttf", 21), 492, (240, 196, 120))):
     w = d.textlength(text, font=f)
     d.text(((W - w) / 2, yy), text, font=f, fill=col)
 # a thin gold rule between the name and the line

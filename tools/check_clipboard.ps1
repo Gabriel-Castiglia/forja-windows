@@ -1,10 +1,10 @@
-# Wyrmhold -- clipboard behaviour, checked from outside the program.
+# Forja -- clipboard behaviour, checked from outside the program.
 # Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 # Date: November 9, 2026 (2.1.0: November 20, 2026)
 # SPDX-License-Identifier: GPL-2.0-only
 #
 # Run it in an interactive desktop session with Windows PowerShell 5.1 (STA, needed to read
-# the clipboard). It copies the program into a temporary folder with an empty wyrmhold.ini
+# the clipboard). It copies the program into a temporary folder with an empty forja.ini
 # beside it (portable use, so the real settings are never read or written), starts it with
 # /clearafter:5, sends it menu commands with PostMessage (same integrity level, so UIPI does
 # not filter them) and reads the clipboard back:
@@ -12,9 +12,9 @@
 #      formats present, and the clipboard empty again after 5 s;
 #   2. Copy all, then something else is copied -> after 5 s that something else is intact;
 #   3. Copy selected, then the window is closed -> the clipboard is empty at once;
-#   4. the empty wyrmhold.ini did not get the /clearafter value (it is for the session only).
+#   4. the empty forja.ini did not get the /clearafter value (it is for the session only).
 # The text on the clipboard before the run is put back at the end. Writes its report to the
-# file given as the first argument. src/wyrmhold.c /selftest checks the same in-process.
+# file given as the first argument. src/forja.c /selftest checks the same in-process.
 
 param([Parameter(Mandatory)] [string]$Report)
 
@@ -36,11 +36,11 @@ public static class W {
 }
 "@
 
-$src = Join-Path (Split-Path -Parent $PSScriptRoot) 'build\wyrmhold.exe'
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ('wyrmhold_clip_' + [guid]::NewGuid().ToString('N'))
+$src = Join-Path (Split-Path -Parent $PSScriptRoot) 'build\forja.exe'
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('forja_clip_' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $tmp | Out-Null
-$exe = Join-Path $tmp 'wyrmhold.exe'
-$ini = Join-Path $tmp 'wyrmhold.ini'
+$exe = Join-Path $tmp 'forja.exe'
+$ini = Join-Path $tmp 'forja.ini'
 Copy-Item -LiteralPath $src -Destination $exe
 Set-Content -LiteralPath $ini -Value '' -Encoding ascii
 

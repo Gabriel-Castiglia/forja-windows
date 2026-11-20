@@ -1,5 +1,5 @@
 @echo off
-rem  Wyrmhold -- builds build\wyrmhold.exe from src\.
+rem  Forja -- builds build\forja.exe from src\.
 rem  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 rem  Date: November 9, 2026
 rem  SPDX-License-Identifier: GPL-2.0-only
@@ -27,12 +27,12 @@ if errorlevel 1 goto :failed
 
 echo [2/2] program
 gcc -B build\nodefman\ -O2 -Wall -Wextra -mwindows -static -DUNICODE -D_UNICODE -Isrc ^
-    -o build\wyrmhold.exe src\wyrmhold.c src\pwgen.c src\update.c build\app.res ^
+    -o build\forja.exe src\forja.c src\pwgen.c src\update.c build\app.res ^
     -lcomctl32 -lcomdlg32 -lgdi32 -luxtheme -ldwmapi -lbcrypt -lshell32 -lgdiplus -lwinhttp -ladvapi32 -lm
 if errorlevel 1 goto :failed
 
 echo.
-echo Built: build\wyrmhold.exe
+echo Built: build\forja.exe
 goto :eof
 
 :failed

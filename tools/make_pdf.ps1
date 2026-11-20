@@ -1,4 +1,4 @@
-﻿# Wyrmhold -- converts docs\wyrmhold_guide_*.docx to PDF with LibreOffice (headless), or with
+﻿# Forja -- converts docs\forja_guide_*.docx to PDF with LibreOffice (headless), or with
 # Microsoft Word when LibreOffice is not installed.
 # Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 # Date: November 9, 2026
@@ -6,7 +6,7 @@
 
 $ErrorActionPreference = 'Stop'
 $docs = Join-Path (Split-Path -Parent $PSScriptRoot) 'docs'
-$files = Get-ChildItem -LiteralPath $docs -Filter 'wyrmhold_guide_*.docx'
+$files = Get-ChildItem -LiteralPath $docs -Filter 'forja_guide_*.docx'
 $soffice = @("$env:ProgramFiles\LibreOffice\program\soffice.exe", "${env:ProgramFiles(x86)}\LibreOffice\program\soffice.exe") |
     Where-Object { Test-Path $_ } | Select-Object -First 1
 

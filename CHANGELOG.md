@@ -1,10 +1,17 @@
 # Changelog
 
-## 2.1.1 — 2026-11-20
+## 3.0.0 — 2026-11-20
 
-- The same program as 2.1.0, built again with the GCC of MSYS2, as every version before 2.1.0 and as this README
-  says; 2.1.0 had been built with the GCC of WinLibs. Same GCC (16.2.0) and linker (2.47), same libraries and the
-  same results; the program no longer carries a threads library it does not use, and it is 21.8 KB smaller.
+**Wyrmhold is now Forja**, a name easier to remember: the forge, where metal takes shape under the hammer, as each
+password here takes shape from pure chance. The same number as Forja 3.0.0 for macOS. The icon is the anvil and
+hammers of the trade card of Elwell and Taylor, smiths of London (c. 1766, British Museum, public domain). The
+repository is now `forja-windows` (GitHub forwards the old address).
+
+- Installing Forja removes Wyrmhold in silence. The first time Forja starts, `%APPDATA%\Wyrmhold\wyrmhold.ini`
+  comes over as `%APPDATA%\Forja\forja.ini` (a portable copy takes the `wyrmhold.ini` beside it as `forja.ini`).
+- The program is `forja.exe`; the installer is `Forja-Setup-<version>.exe`.
+- Built with the GCC of MSYS2, as every version before 2.1.0 (2.1.0 had been built with the GCC of WinLibs; same GCC
+  16.2.0 and linker 2.47, and the program no longer carries a threads library it does not use).
 
 ## 2.1.0 — 2026-11-20
 

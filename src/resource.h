@@ -1,5 +1,5 @@
 /**
-  Wyrmhold -- resource and command identifiers.
+  Forja -- resource and command identifiers.
   Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
   Date: November 9, 2026
   SPDX-License-Identifier: GPL-2.0-only
@@ -38,6 +38,6 @@
 #define IDM_THEMEDLG     344
 #define IDM_SYM_0        365     /* + PW_SYM_* */
 #define IDM_SEP_0        370     /* + PW_SEP_* */
-#define IDM_CLR_0        380     /* + index in CLEAR_CHOICES (wyrmhold.c) */
+#define IDM_CLR_0        380     /* + index in CLEAR_CHOICES (forja.c) */
 
 #endif

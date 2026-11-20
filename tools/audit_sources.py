@@ -1,5 +1,5 @@
 """
-Wyrmhold -- audits the source tree before it is published.
+Forja -- audits the source tree before it is published.
 Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 Date: November 9, 2026
 SPDX-License-Identifier: GPL-2.0-only
@@ -23,7 +23,7 @@ ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().pare
 TEXT = {".c", ".h", ".rc", ".py", ".ps1", ".bat", ".xml", ".txt", ".md", ".iss"}
 NEEDS_AUTHOR = {".c", ".h", ".rc", ".py", ".ps1", ".bat"}
 SKIP = set()
-TRANSLATED = {"ui_strings.h", "make_guide.py", "README.md", "Wyrmhold.iss"}   # text in three languages
+TRANSLATED = {"ui_strings.h", "make_guide.py", "README.md", "Forja.iss"}   # text in three languages
 
 JAPANESE = "[" + chr(0x3040) + "-" + chr(0x30FF) + chr(0x4E00) + "-" + chr(0x9FFF) + "]"
 SPANISH = "[" + "".join(chr(c) for c in (0xE1, 0xE9, 0xED, 0xF3, 0xFA, 0xF1, 0xC1, 0xC9, 0xCD, 0xD3, 0xDA, 0xD1, 0xBF, 0xA1)) + "]"
@@ -66,7 +66,7 @@ v_num = ".".join(num(k) for k in ("WH_VER_MAJOR", "WH_VER_MINOR", "WH_VER_PATCH"
 v_str = re.search(r'#define WH_VERSION_STR\s+"([\d.]+)"', vh).group(1)
 if v_num != v_str:
     fail(f"version.h disagrees with itself: numbers {v_num}, string {v_str}")
-for f in ("wyrmhold.c", "app.rc"):
+for f in ("forja.c", "app.rc"):
     if re.search(r'"\d+\.\d+\.\d+"|\b\d+,\d+,\d+,\d+\b', (src / f).read_text(encoding="utf-8")):
         fail(f"{f}: a version written by hand (it belongs in version.h)")
 
