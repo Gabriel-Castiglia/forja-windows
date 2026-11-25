@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.0.1 — 2026-11-25
+
+- Generate no longer freezes the window with very tight rules (for example only digits, no repeats and a length of
+  128 took 14 seconds and then failed). With "no repeats" each character is drawn among all but the one before it,
+  which keeps every valid password exactly as likely. Rules that leave so few passwords that drawing one would take
+  too long are refused at once: Generate is greyed out and the status line says why, in English, Japanese and
+  Spanish. The message no longer blames the Windows random number generator when the rules were the cause.
+- `/out` exit codes: 6 when no draw followed the rules within the tries allowed, 3 when the random number generator
+  failed (they were both 3); the file is left empty after any failure.
+- The random numbers are asked for in blocks, and what is left of a block is wiped when the password is made.
+- Updates: each download goes to a new folder with a random name under `%TEMP%`, the setup is kept locked against
+  writing from the moment it is checked until it starts, and setups and cut downloads left by earlier updates are
+  deleted when Forja starts.
+- Turning "Clear clipboard after" off now stops the countdown already running; turning it on starts one if the
+  clipboard still holds Forja's copy.
+- Save to file writes everything or nothing: a write that fails leaves no half-written file.
+- The window opens where it was also when the taskbar is at the top or on the left (it drifted a little each time).
+- Copy all no longer adds a line break after the last password.
+- Setup: if removing Wyrmhold fails, the setup says so; the uninstaller also offers to delete `%APPDATA%\Wyrmhold`.
+
 ## 3.0.0 — 2026-11-20
 
 **Wyrmhold is now Forja**, a name easier to remember: the forge, where metal takes shape under the hammer, as each

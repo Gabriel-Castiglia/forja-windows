@@ -56,6 +56,9 @@ es.Tagline=Contraseñas, frases y PIN fuertes, hechos en esta computadora y sin 
 en.RemoveSettings=Also delete Forja's settings (language, theme, last options)?
 ja.RemoveSettings=Forja の設定（言語・テーマ・最後のオプション）も削除しますか？
 es.RemoveSettings=¿Borrar también la configuración de Forja (idioma, tema, últimas opciones)?
+en.WyrmholdLeft=Wyrmhold, the former name of Forja, could not be uninstalled (code %1). Both are installed now: you can remove Wyrmhold from Settings > Apps.
+ja.WyrmholdLeft=Forja の旧名 Wyrmhold をアンインストールできませんでした（コード %1）。現在は両方がインストールされています。Wyrmhold は［設定］>［アプリ］から削除できます。
+es.WyrmholdLeft=No se pudo desinstalar Wyrmhold, el nombre anterior de Forja (código %1). Ahora están instalados los dos: podés quitar Wyrmhold desde Configuración > Aplicaciones.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -86,6 +89,8 @@ Filename: "{app}\forja.exe"; Parameters: "/updated"; Flags: nowait runasoriginal
 const
   WyrmholdKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{0B42F4DD-81B9-4012-A29C-7DAE09A1DA5A}_is1';
 
+// If it cannot be removed (an install for all users while this setup runs per user, an
+// elevation prompt refused...) the setup goes on and says so, instead of leaving both in silence.
 procedure RemoveWyrmhold();
 var
   S: String;
@@ -96,7 +101,13 @@ begin
   begin
     S := RemoveQuotes(S);
     if FileExists(S) then
-      Exec(S, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, Rc);
+    begin
+      if not Exec(S, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, Rc) then
+        Rc := -1;
+      if (Rc <> 0) and (RegValueExists(HKCU, WyrmholdKey, 'UninstallString') or
+                        RegValueExists(HKLM, WyrmholdKey, 'UninstallString')) then
+        SuppressibleMsgBox(FmtMessage(CustomMessage('WyrmholdLeft'), [IntToStr(Rc)]), mbError, MB_OK, IDOK);
+    end;
   end;
 end;
 
@@ -147,17 +158,22 @@ begin
   else Result := 'en';
 end;
 
-// Settings live in %APPDATA%\Forja (forja.ini). Ask before deleting them, and never in
-// a silent uninstall.
+// Settings live in %APPDATA%\Forja (forja.ini); %APPDATA%\Wyrmhold may still hold the ones of
+// the former name, which Forja read once and left there. Ask before deleting them (one question
+// for both), and never in a silent uninstall.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  Dir: String;
+  Dir, Old: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
     Dir := ExpandConstant('{userappdata}\Forja');
-    if DirExists(Dir) and not UninstallSilent then
+    Old := ExpandConstant('{userappdata}\Wyrmhold');
+    if (DirExists(Dir) or DirExists(Old)) and not UninstallSilent then
       if MsgBox(CustomMessage('RemoveSettings'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-        DelTree(Dir, True, True, True);
+      begin
+        if DirExists(Dir) then DelTree(Dir, True, True, True);
+        if DirExists(Old) then DelTree(Old, True, True, True);
+      end;
   end;
 end;

@@ -22,8 +22,10 @@
     Every character (or word) comes from BCryptGenRandom, the Windows cryptographic random
     number generator, through rejection sampling, so each one is exactly equally likely --
     a plain "x % n" would favour the first few. For PW_CHARS and PW_PIN the whole password
-    is drawn at once and thrown away when it breaks a rule (a required class missing, a
-    repeated neighbour, a run...), then drawn again. That makes the result uniform over
+    is drawn at once (the first character from the letters when it must be a letter; with
+    repeats off, every later one from all the characters but the previous one) and thrown
+    away when it breaks a rule (a required class missing, a run...), then drawn again.
+    That makes the result uniform over
     *every* password that obeys the rules -- no position, class or pattern is more likely
     than another -- which a "one of each class, then shuffle" method would only
     approximate. pw_entropy() counts those passwords exactly (by dynamic programming over
@@ -52,8 +54,12 @@ enum { PW_CHARS = 0, PW_WORDS = 1, PW_PIN = 2 };
 enum { PW_SYM_BASIC = 0, PW_SYM_ALL = 1, PW_SYM_MIN = 2, PW_SYM_CUSTOM = 3 };
 enum { PW_SEP_HYPHEN = 0, PW_SEP_SPACE, PW_SEP_DOT, PW_SEP_UNDERSCORE, PW_SEP_NONE, PW_SEP_DIGIT, PW_SEP_COUNT };
 
-/* What pw_check() can object to. */
-enum { PW_OK = 0, PW_ERR_NOCLASS, PW_ERR_EMPTYCLASS, PW_ERR_TOOSHORT, PW_ERR_NODIGITS };
+/* What pw_check() can object to. PW_ERR_TOOTIGHT: possible, but so few draws follow the rules
+ * (fewer than 1 in 10^4) that making one could take seconds or minutes. */
+enum { PW_OK = 0, PW_ERR_NOCLASS, PW_ERR_EMPTYCLASS, PW_ERR_TOOSHORT, PW_ERR_NODIGITS, PW_ERR_TOOTIGHT };
+
+/* Why pw_make_ex() made nothing. */
+enum { PW_FAIL_NONE = 0, PW_FAIL_RULES, PW_FAIL_TRIES, PW_FAIL_RNG };
 
 typedef struct {
 	int mode;                       /* PW_CHARS, PW_WORDS or PW_PIN */
@@ -90,6 +96,11 @@ int pw_check(const PwOptions* o, int* which);
  * or 0 if the options are impossible or the random number generator failed (out is then
  * emptied). Lengths are clamped to their ranges. */
 int pw_make(const PwOptions* o, char* out);
+
+/* The same, and `why` (may be NULL) receives PW_FAIL_NONE, or why nothing was made:
+ * PW_FAIL_RULES (pw_check refused the options), PW_FAIL_TRIES (no draw followed the rules
+ * within the tries allowed) or PW_FAIL_RNG (the random number generator failed). */
+int pw_make_ex(const PwOptions* o, char* out, int* why);
 
 /* log2 of the number of different passwords these options can produce (exact for
  * characters and PINs, all rules included). 0 if impossible. */

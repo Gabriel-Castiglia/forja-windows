@@ -213,6 +213,78 @@ for c in [
 ]:
     check_case(c)
 
+
+# --- rules so tight that most draws fail -----------------------------------------------------
+# Up to 3.0.0 these froze the window for seconds or minutes, and some ended blaming the random
+# number generator. Now they are made at once, or refused by pw_check (PW_ERR_TOOTIGHT = 5).
+def check_fast(c, count, limit=5.0):
+    global fails
+    import time
+    a = args_of(c)
+    out = TMP / "out.txt"
+    t = time.perf_counter()
+    rc = run(a + [f"/count:{count}"], f"/out:{out}")
+    secs = time.perf_counter() - t
+    lines = out.read_bytes().decode("ascii").split("\r\n")[:-1] if rc == 0 else []
+    test = chars_ok if c["mode"] == "chars" else pin_ok
+    bad = [(p, test(p, c)) for p in lines if test(p, c)]
+    ok = rc == 0 and not bad and len(lines) == count and secs < limit
+    fails += not ok
+    print("ok  " if ok else "BAD ", " ".join(a), f"| exit {rc}, {len(lines)} passwords in {secs:.2f} s",
+          f"| first problem: {bad[0]}" if bad else "")
+
+
+def check_refused(c):
+    global fails
+    a = args_of(c)
+    ent, out = TMP / "ent.txt", TMP / "out.txt"
+    run(a, f"/entropy:{ent}")
+    check = int(ent.read_text().split()[2])
+    rc = run(a + ["/count:5"], f"/out:{out}")
+    ok = check == 5 and rc == 5
+    fails += not ok
+    print("ok  " if ok else "BAD ", " ".join(a), f"| refused as too tight: check {check}, exit {rc} (expected 5 and 5)")
+
+
+check_fast({"mode": "chars", "len": 128, "classes": "d", "norepeat": True}, 50)
+check_fast({"mode": "pin", "len": 128, "norepeat": True}, 50)
+check_fast({"mode": "pin", "len": 30, "norepeat": True, "exclude": "3456789"}, 50)
+check_fast({"mode": "pin", "len": 45, "norepeat": True, "exclude": "3456789"}, 50)   # the tightest still accepted
+check_refused({"mode": "pin", "len": 46, "norepeat": True, "exclude": "3456789"})
+check_refused({"mode": "pin", "len": 128, "norepeat": True, "exclude": "3456789"})
+
+
+# --- uniformity: every valid password equally likely ----------------------------------------
+# Letters a b and digits 2 3 9, 5 characters, no repeated neighbours, first a letter: 510 valid
+# passwords; 100,000 draws (about 196 each) must spread evenly (chi-square, |z| < 4). The same
+# letters and digits with no other rule: 2,850 valid passwords, about 35 draws each.
+def check_uniform(c, count):
+    global fails
+    a = args_of(c)
+    out = TMP / "out.txt"
+    rc = run(a + [f"/count:{count}"], f"/out:{out}")
+    lines = out.read_bytes().decode("ascii").split("\r\n")[:-1] if rc == 0 else []
+    cls = classes(c)
+    alpha = "".join(cls)
+    valid = ["".join(p) for p in itertools.product(alpha, repeat=c["len"]) if chars_ok("".join(p), c) is None]
+    seen = {v: 0 for v in valid}
+    stray = 0
+    for p in lines:
+        if p in seen: seen[p] += 1
+        else: stray += 1
+    e = len(lines) / len(valid) if valid else 0
+    chi = sum((n - e) ** 2 / e for n in seen.values()) if e else 0
+    z = (chi - (len(valid) - 1)) / math.sqrt(2 * (len(valid) - 1)) if len(valid) > 1 else 99
+    ok = rc == 0 and len(lines) == count and not stray and abs(z) < 4
+    fails += not ok
+    print("ok  " if ok else "BAD ", " ".join(a), f"| {len(valid)} valid passwords, {count} drawn, chi-square z = {z:.2f}")
+
+
+check_uniform({"mode": "chars", "len": 5, "classes": "ld", "exclude": "cdefghijklmnopqrstuvwxyz0145678",
+               "avoid": False, "norepeat": True, "startletter": True}, 100000)
+check_uniform({"mode": "chars", "len": 5, "classes": "ld", "exclude": "cdefghijklmnopqrstuvwxyz0145678",
+               "avoid": False}, 100000)
+
 print()
 print("ALL OPTION CHECKS PASSED" if not fails else f"FAILED: {fails}")
 sys.exit(1 if fails else 0)

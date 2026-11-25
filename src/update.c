@@ -282,24 +282,39 @@ int upd_sha256(const void* data, size_t n, BYTE out[32])
 	return shaClose(&s, out) && ok;
 }
 
-int upd_sha256_file(const wchar_t* path, char out[65])
+int upd_sha256_handle(HANDLE f, char out[65])
 {
 	static BYTE buf[65536];
-	HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	BYTE h[32];
 	DWORD got;
+	LARGE_INTEGER zero;
 	Sha s;
 	int ok = 1, i;
 
-	if (f == INVALID_HANDLE_VALUE) return 0;
-	if (!shaOpen(&s)) { CloseHandle(f); return 0; }
-	while (ok && ReadFile(f, buf, sizeof(buf), &got, NULL) && got > 0)
-		ok = BCryptHashData(s.h, buf, got, 0) == 0;
-	CloseHandle(f);
+	zero.QuadPart = 0;
+	if (!SetFilePointerEx(f, zero, NULL, FILE_BEGIN)) return 0;
+	if (!shaOpen(&s)) return 0;
+	for (;;)
+	{
+		if (!ReadFile(f, buf, sizeof(buf), &got, NULL)) { ok = 0; break; }
+		if (got == 0) break;
+		if (BCryptHashData(s.h, buf, got, 0) != 0) { ok = 0; break; }
+	}
 	if (!shaClose(&s, h) || !ok) return 0;
 	for (i = 0; i < 32; i++) sprintf(out + 2 * i, "%02x", h[i]);
 	out[64] = 0;
 	return 1;
+}
+
+int upd_sha256_file(const wchar_t* path, char out[65])
+{
+	HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	int ok;
+
+	if (f == INVALID_HANDLE_VALUE) return 0;
+	ok = upd_sha256_handle(f, out);
+	CloseHandle(f);
+	return ok;
 }
 
 /* ------------------------------------------------------------------ installed or portable */

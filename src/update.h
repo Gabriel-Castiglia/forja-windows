@@ -52,6 +52,9 @@ DWORD upd_http_get(const wchar_t* url, const wchar_t* agent, const wchar_t* acce
 int upd_sha256(const void* data, size_t n, BYTE out[32]);
 int upd_sha256_file(const wchar_t* path, char out[65]);
 
+/* The same through a handle already open (read from the start). */
+int upd_sha256_handle(HANDLE f, char out[65]);
+
 /* 1 when this executable is the one the setup installed (its folder is the InstallLocation
  * the setup recorded), 0 for a portable copy, which cannot update itself. */
 int upd_installed_copy(void);

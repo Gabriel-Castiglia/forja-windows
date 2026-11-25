@@ -64,7 +64,10 @@
         forja.exe /selftest:<log>
 
       /out writes the passwords (count up to 100000) and exits without a window; without
-      options they use the standard profile. /entropy writes "bits pool check" and exits.
+      options they use the standard profile. Its exit code: 0 done, 2 the file could not be
+      written, 3 the random number generator failed, 5 the options cannot make a password
+      (pw_check), 6 no draw followed the rules within the tries allowed (and the file is
+      left empty in every failure). /entropy writes "bits pool check" and exits.
       /shot draws the window into a bitmap and exits; with it, /shotdpi:N draws at another
       scale and /shotarea:WxH stands in for the screen's work area (in pixels), to see the
       window as on a small screen. None of them writes the .ini.
@@ -81,6 +84,7 @@
 #include <shellapi.h>
 #include <uxtheme.h>
 #include <dwmapi.h>
+#include <bcrypt.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -94,6 +98,10 @@
 #include "ui_strings.h"
 #include "update.h"
 #include "version.h"
+
+#ifndef BCRYPT_USE_SYSTEM_PREFERRED_RNG
+#define BCRYPT_USE_SYSTEM_PREFERRED_RNG 0x00000002
+#endif
 
 #define WIDEN_(s)     L##s
 #define WIDEN(s)      WIDEN_(s)
@@ -1025,12 +1033,14 @@ static void doGenerate(void)
 
 	for (i = 0; i < gCount; i++)
 	{
-		if (!pw_make(&o, gPw[i]))
+		int why;
+		if (!pw_make_ex(&o, gPw[i], &why))
 		{
 			wipePasswords();
 			SendMessageW(hList, LB_RESETCONTENT, 0, 0);
 			SendMessageW(hList, WM_SETREDRAW, TRUE, 0);
-			setStatus(ST_ERR, T(S_ST_RNG_FAIL));
+			/* the random number generator is blamed only when it really failed */
+			setStatus(ST_ERR, T(why == PW_FAIL_RNG ? S_ST_RNG_FAIL : S_ST_TRIES_FAIL));
 			return;
 		}
 		/* no LBS_HASSTRINGS: the list keeps only the row number, never the password */
@@ -1179,6 +1189,26 @@ static void armClipWipe(void)
 	}
 }
 
+static void showCopied(void);
+
+/* The "clear the clipboard" switch was flipped. It acts on the copy already made too:
+ * switched off, a countdown in progress stops and the copy stays; switched on, a copy that is
+ * still ours (and still on the clipboard) starts its countdown now. */
+static void clearSwitched(void)
+{
+	if (!gClearClip)
+	{
+		if (gClipLeft <= 0) return;
+		KillTimer(hMain, TMR_CLIP);
+		gClipLeft = 0;
+		showCopied();
+		return;
+	}
+	if (gClipLeft > 0 || !clipboardStillOurs()) return;
+	armClipWipe();
+	showCopied();
+}
+
 static void showCopied(void)
 {
 	wchar_t buf[512];
@@ -1228,11 +1258,12 @@ static void copyAll(void)
 
 	if (gPwN <= 0) return;
 
+	/* one per line, with no line break after the last one: pasted into a single field, a
+	 * one-row list is just the password */
 	for (i = 0; i < gPwN; i++)
 	{
+		if (i) { w[n++] = L'\r'; w[n++] = L'\n'; }
 		n += MultiByteToWideChar(CP_ACP, 0, gPw[i], -1, w + n, PW_OUT_MAX) - 1;
-		w[n++] = L'\r';
-		w[n++] = L'\n';
 	}
 	w[n] = 0;
 
@@ -1281,14 +1312,25 @@ static void clipTick(void)
 
 /* ------------------------------------------------------------------ saving */
 
+/* The list is written to a temporary file in the same folder and only then put in place of
+ * `path`: a failed write (full disk, a pulled USB stick) never leaves a half-written file of
+ * passwords, nor spoils a file that was there before. The temporary file goes if anything fails. */
 static void writePasswords(const wchar_t* path, int* ok)
 {
-	HANDLE f = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	wchar_t dir[MAX_PATH], tmp[MAX_PATH];
+	wchar_t* slash;
+	HANDLE f;
 	DWORD done;
 	int i;
 
 	*ok = 0;
-	if (f == INVALID_HANDLE_VALUE) return;
+	lstrcpynW(dir, path, MAX_PATH);
+	slash = wcsrchr(dir, L'\\');
+	if (slash) *slash = 0; else lstrcpyW(dir, L".");
+	if (!GetTempFileNameW(dir, L"frj", 0, tmp)) return;
+
+	f = CreateFileW(tmp, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (f == INVALID_HANDLE_VALUE) { DeleteFileW(tmp); return; }
 
 	*ok = 1;
 	for (i = 0; i < gPwN && *ok; i++)
@@ -1297,7 +1339,10 @@ static void writePasswords(const wchar_t* path, int* ok)
 		if (!WriteFile(f, gPw[i], len, &done, NULL) || done != len) *ok = 0;
 		if (*ok && (!WriteFile(f, "\r\n", 2, &done, NULL) || done != 2)) *ok = 0;
 	}
-	CloseHandle(f);
+	if (*ok && !FlushFileBuffers(f)) *ok = 0;
+	if (!CloseHandle(f)) *ok = 0;
+	if (*ok && !MoveFileExW(tmp, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) *ok = 0;
+	if (!*ok) DeleteFileW(tmp);
 }
 
 static void rememberFolderOf(const wchar_t* file)
@@ -1386,7 +1431,7 @@ static void paintStrength(HDC dc)
 	if (check != PW_OK)
 	{
 		int id = check == PW_ERR_NOCLASS ? S_ERR_NOCLASS : check == PW_ERR_EMPTYCLASS ? S_ERR_EMPTYCLASS :
-		         check == PW_ERR_NODIGITS ? S_ERR_NODIGITS : S_ERR_TOOSHORT;
+		         check == PW_ERR_NODIGITS ? S_ERR_NODIGITS : check == PW_ERR_TOOTIGHT ? S_ERR_TOOTIGHT : S_ERR_TOOSHORT;
 		_snwprintf(buf, 256, T(id), which >= 0 ? T(classNames[which]) : L"");
 		buf[255] = 0;
 		t = r;
@@ -3519,6 +3564,8 @@ typedef struct UpdJob {
 	int errStr;                         /* or a string saying what went wrong; 0 = none */
 	UpdRelease rel;
 	wchar_t file[MAX_PATH];             /* the verified setup (stage 1) */
+	HANDLE lock;                        /* read handle to it, denying writes and deletes: from
+	                                     * the hash until the setup has started, nobody can swap it */
 } UpdJob;
 
 static int gUpdBusy = 0;                /* a check or a download is running */
@@ -3558,7 +3605,11 @@ static int sinkFile(void* ctx, const BYTE* d, DWORD n, ULONGLONG done, ULONGLONG
 
 static void finishJob(UpdJob* j)
 {
-	if (!PostMessageW(hMain, WM_APP_UPDATE, 0, (LPARAM)j)) free(j);     /* the window is gone */
+	if (!PostMessageW(hMain, WM_APP_UPDATE, 0, (LPARAM)j))              /* the window is gone */
+	{
+		if (j->stage && j->lock && j->lock != INVALID_HANDLE_VALUE) CloseHandle(j->lock);
+		free(j);
+	}
 }
 
 /* The thread of the check: the latest release, as the GitHub API describes it. */
@@ -3582,8 +3633,74 @@ static DWORD WINAPI checkThread(void* arg)
 	return 0;
 }
 
-/* The thread of the download: SHA256SUMS.txt, then the setup, then its hash. A setup that is
- * incomplete or does not match is deleted here, so it can never be run. */
+/* Downloads go to %TEMP%\ForjaUpdate-<16 random hex digits>, a new folder each time, so no
+ * other program can prepare a file there in advance. Returns 0 if no folder could be made. */
+static int newUpdateFolder(wchar_t* dir)
+{
+	wchar_t base[MAX_PATH];
+	BYTE r[8];
+	int tries, i;
+
+	if (!GetTempPathW(MAX_PATH, base)) return 0;
+	for (tries = 0; tries < 8; tries++)
+	{
+		wchar_t* p;
+		if (BCryptGenRandom(NULL, r, sizeof(r), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) return 0;
+		_snwprintf(dir, MAX_PATH, L"%lsForjaUpdate-", base);
+		dir[MAX_PATH - 1] = 0;
+		p = dir + wcslen(dir);
+		if (p + 17 > dir + MAX_PATH) return 0;
+		for (i = 0; i < 8; i++) { _snwprintf(p, 3, L"%02x", r[i]); p += 2; }
+		*p = 0;
+		if (CreateDirectoryW(dir, NULL)) return 1;
+		if (GetLastError() != ERROR_ALREADY_EXISTS) return 0;
+	}
+	return 0;
+}
+
+/* Removes the setups of earlier updates (run, failed or cut short when the program closed):
+ * %TEMP%\ForjaUpdate (3.0.0 and earlier) and every %TEMP%\ForjaUpdate-*. A file still in use
+ * (a setup still running, another window downloading) refuses and stays for the next start. */
+static void removeUpdateLeftovers(void)
+{
+	wchar_t base[MAX_PATH], pat[MAX_PATH], dir[MAX_PATH], f[MAX_PATH];
+	WIN32_FIND_DATAW d, e;
+	HANDLE h, k;
+
+	if (!GetTempPathW(MAX_PATH, base)) return;
+	_snwprintf(pat, MAX_PATH, L"%lsForjaUpdate*", base);
+	pat[MAX_PATH - 1] = 0;
+	h = FindFirstFileW(pat, &d);
+	if (h == INVALID_HANDLE_VALUE) return;
+	do
+	{
+		if (!(d.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || (d.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) continue;
+		if (wcscmp(d.cFileName, L"ForjaUpdate") && wcsncmp(d.cFileName, L"ForjaUpdate-", 12)) continue;
+		_snwprintf(dir, MAX_PATH, L"%ls%ls", base, d.cFileName);
+		dir[MAX_PATH - 1] = 0;
+		_snwprintf(pat, MAX_PATH, L"%ls\\*", dir);
+		pat[MAX_PATH - 1] = 0;
+		k = FindFirstFileW(pat, &e);
+		if (k != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				if (e.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+				_snwprintf(f, MAX_PATH, L"%ls\\%ls", dir, e.cFileName);
+				f[MAX_PATH - 1] = 0;
+				DeleteFileW(f);
+			} while (FindNextFileW(k, &e));
+			FindClose(k);
+		}
+		RemoveDirectoryW(dir);
+	} while (FindNextFileW(h, &d));
+	FindClose(h);
+}
+
+/* The thread of the download: SHA256SUMS.txt, then the setup, then its hash. The hash is taken
+ * through a handle that denies writing and deleting to everyone else and stays open until the
+ * setup has been started (onUpdateDone), so the file that runs is the file that was checked.
+ * A setup that is incomplete or does not match is deleted here, so it can never be run. */
 static DWORD WINAPI downloadThread(void* arg)
 {
 	UpdJob* j = (UpdJob*)arg;
@@ -3591,9 +3708,8 @@ static DWORD WINAPI downloadThread(void* arg)
 	char want[65], got[65];
 	MemSink m;
 
-	GetTempPathW(MAX_PATH, dir);
-	wcsncat(dir, L"ForjaUpdate", MAX_PATH - wcslen(dir) - 1);
-	CreateDirectoryW(dir, NULL);
+	j->lock = INVALID_HANDLE_VALUE;
+	if (!newUpdateFolder(dir)) { j->err = GetLastError() ? GetLastError() : ERROR_PATH_NOT_FOUND; finishJob(j); return 0; }
 	MultiByteToWideChar(CP_UTF8, 0, j->rel.setupName, -1, name, 128);
 	_snwprintf(j->file, MAX_PATH, L"%ls\\%ls", dir, name);
 	j->file[MAX_PATH - 1] = 0;
@@ -3619,11 +3735,23 @@ static DWORD WINAPI downloadThread(void* arg)
 		{
 			MultiByteToWideChar(CP_UTF8, 0, j->rel.setupUrl, -1, url, 1024);
 			j->err = upd_http_get(url, UPD_AGENT, NULL, 60000, sinkFile, &s);
+			if (!FlushFileBuffers(s.f) && !j->err) j->err = GetLastError();
 			CloseHandle(s.f);
-			if (!j->err && (!upd_sha256_file(j->file, got) || strcmp(got, want))) j->errStr = S_UPD_BADHASH;
-			if (j->err || j->errStr) DeleteFileW(j->file);
+			if (!j->err)
+			{
+				j->lock = CreateFileW(j->file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+				if (j->lock == INVALID_HANDLE_VALUE) j->err = GetLastError();
+				else if (!upd_sha256_handle(j->lock, got) || strcmp(got, want)) j->errStr = S_UPD_BADHASH;
+			}
+			if (j->err || j->errStr)
+			{
+				if (j->lock != INVALID_HANDLE_VALUE) { CloseHandle(j->lock); j->lock = INVALID_HANDLE_VALUE; }
+				DeleteFileW(j->file);
+				RemoveDirectoryW(dir);
+			}
 		}
 	}
+	else RemoveDirectoryW(dir);
 	finishJob(j);
 	return 0;
 }
@@ -3807,12 +3935,15 @@ static void onUpdateDone(UpdJob* j)
 		sei.nShow = SW_SHOWNORMAL;
 		if (ShellExecuteExW(&sei))
 		{
+			/* the setup has started (SEE_MASK_NOASYNC): the file can be let go */
+			if (j->lock && j->lock != INVALID_HANDLE_VALUE) CloseHandle(j->lock);
 			free(j);
 			DestroyWindow(hMain);
 			return;
 		}
 		j->err = GetLastError();                /* refused, e.g. the elevation prompt cancelled */
 	}
+	if (j->lock && j->lock != INVALID_HANDLE_VALUE) { CloseHandle(j->lock); j->lock = INVALID_HANDLE_VALUE; }
 	setStatus(ST_PLAIN, T(S_ST_READY));
 	updateMessage(S_UPD_FAILED, j);
 	free(j);
@@ -3896,7 +4027,7 @@ static void onCommand(HWND hwnd, int id, int code, HWND ctl)
 			if (c->bind) *c->bind = !*c->bind;
 			InvalidateRect(ctl, NULL, FALSE);
 			if (id != IDC_TG_CLEAR) onOptionsChanged(1);
-			else { gClearFromArg = 0; InvalidateRect(hClearTime, NULL, FALSE); }
+			else { gClearFromArg = 0; InvalidateRect(hClearTime, NULL, FALSE); clearSwitched(); }
 			return;
 		}
 		if (c->kind == K_SEG) { setMode(c->value); return; }
@@ -4276,7 +4407,16 @@ static int writeAuto(const wchar_t* path, const PwOptions* o, int count)
 	if (pw_check(o, NULL) != PW_OK) { fclose(f); return 5; }
 	for (i = 0; i < count; i++)
 	{
-		if (!pw_make(o, pw)) { SecureZeroMemory(pw, sizeof(pw)); fclose(f); return 3; }
+		int why;
+		if (!pw_make_ex(o, pw, &why))
+		{
+			/* what was already written goes too: no half list of passwords is left behind */
+			SecureZeroMemory(pw, sizeof(pw));
+			fclose(f);
+			f = _wfopen(path, L"wb");
+			if (f) fclose(f);
+			return why == PW_FAIL_RNG ? 3 : 6;
+		}
 		fputs(pw, f);
 		fputs("\r\n", f);
 	}
@@ -4691,6 +4831,27 @@ static int selfTest(const wchar_t* logPath)
 	wipeOnExit();
 	testCheck(clipboardIs(L"WH-SELFTEST-6"), "clipboard: with clearing off a copy stays, also on exit");
 
+	/* the switch acts on the copy already made */
+	gClearClip = 1;
+	gClearSecs = 1;
+	clearSwitched();
+	testCheck(gClipLeft == 1, "clipboard: switching clearing on starts the countdown for the copy still there");
+	pump(1700);
+	testCheck(CountClipboardFormats() == 0, "clipboard: ...and wipes it when the time is up");
+	gClearSecs = CLIP_DEFAULT;
+	putClipboard(L"WH-SELFTEST-7");
+	armClipWipe();
+	gClearClip = 0;
+	clearSwitched();
+	testCheck(gClipLeft == 0, "clipboard: switching clearing off stops the countdown in progress");
+	wipeOnExit();
+	testCheck(clipboardIs(L"WH-SELFTEST-7"), "clipboard: ...and the copy stays, also on exit");
+	putClipboard(L"WH-SELFTEST-8");
+	otherCopies(other, L"WH-SELFTEST-OTHER");
+	gClearClip = 1;
+	clearSwitched();
+	testCheck(gClipLeft == 0 && clipboardIs(L"WH-SELFTEST-OTHER"), "clipboard: switching on leaves another program's copy alone");
+
 	testCheck(restoreUserClipboard(), "clipboard: the user's content is put back");
 	if (hadText)
 	{
@@ -4710,7 +4871,52 @@ static int selfTest(const wchar_t* logPath)
 	}
 	forgetClipboard();
 
-	/* 3. the update's pure functions */
+	/* 3. saving a list: the whole file or nothing, and no temporary file left behind */
+	{
+		wchar_t f[MAX_PATH], pat[MAX_PATH];
+		WIN32_FIND_DATAW d;
+		HANDLE h;
+		char back[64] = { 0 };
+		DWORD got = 0;
+		int ok, left = 0;
+
+		lstrcpyA(gPw[0], "Abc-1");
+		lstrcpyA(gPw[1], "Def-2");
+		gPwN = 2;
+		_snwprintf(f, MAX_PATH, L"%ls\\list.txt", dir);
+		f[MAX_PATH - 1] = 0;
+		writePasswords(f, &ok);
+		h = CreateFileW(f, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+		if (h != INVALID_HANDLE_VALUE) { ReadFile(h, back, sizeof(back) - 1, &got, NULL); CloseHandle(h); }
+		_snwprintf(pat, MAX_PATH, L"%ls\\frj*.tmp", dir);
+		pat[MAX_PATH - 1] = 0;
+		h = FindFirstFileW(pat, &d);
+		if (h != INVALID_HANDLE_VALUE) { left = 1; FindClose(h); }
+		testCheck(ok && !strcmp(back, "Abc-1\r\nDef-2\r\n") && !left, "save: the list is written whole, no temporary file stays");
+		DeleteFileW(f);
+		_snwprintf(f, MAX_PATH, L"%ls\\no such folder\\list.txt", dir);
+		f[MAX_PATH - 1] = 0;
+		writePasswords(f, &ok);
+		testCheck(!ok && GetFileAttributesW(f) == INVALID_FILE_ATTRIBUTES, "save: a failed save leaves no file");
+		wipePasswords();
+	}
+
+	/* 4. the update's download folder is new each time, and old ones are cleared away */
+	{
+		wchar_t a[MAX_PATH], b[MAX_PATH], f[MAX_PATH];
+		HANDLE h;
+		int made = newUpdateFolder(a) && newUpdateFolder(b);
+		testCheck(made && lstrcmpiW(a, b) != 0, "update: every download gets a new random folder");
+		_snwprintf(f, MAX_PATH, L"%ls\\Forja-Setup-0.0.0.exe", a);
+		f[MAX_PATH - 1] = 0;
+		h = CreateFileW(f, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+		if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
+		removeUpdateLeftovers();
+		testCheck(GetFileAttributesW(a) == INVALID_FILE_ATTRIBUTES && GetFileAttributesW(b) == INVALID_FILE_ATTRIBUTES,
+		          "update: setups and folders of earlier downloads are removed");
+	}
+
+	/* 5. the update's pure functions */
 	gTestFails += upd_selftest(gTestLog);
 
 	DeleteFileW(gIni);
@@ -4760,7 +4966,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	RECT want;
 	const char *outPath = NULL, *shotPath = NULL, *openWhat = NULL, *entPath = NULL;
 	const char *testPath = NULL, *clearArg = NULL;
-	int i, langArg = -1, ww, wh, wx, wy, rc = 0, updated = 0, shotDpi = 0, areaW = 0, areaH = 0;
+	int i, langArg = -1, ww, wh, wx, wy, rc = 0, updated = 0, shotDpi = 0, areaW = 0, areaH = 0, savedPos;
 
 	(void)prev; (void)cmdLine;
 
@@ -4906,6 +5112,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		SetRect(&saved, wx, wy, wx + ww, wy + wh);
 		if (!MonitorFromRect(&saved, MONITOR_DEFAULTTONULL)) wx = wy = CW_USEDEFAULT;
 	}
+	savedPos = !shotPath && wx != CW_USEDEFAULT;
 	{
 		/* never larger than the work area of its screen (small screens, high scaling); a new
 		 * window is centred in it. /shotarea stands in for a screen when taking screenshots. */
@@ -4930,6 +5137,24 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 
 	hMain = CreateWindowExW(0, L"Forja", T(S_WINDOW_TITLE), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
 	                        wx, wy, ww, wh, NULL, NULL, inst, NULL);
+
+	/* WndX/WndY come from GetWindowPlacement (saveSettings), in workspace coordinates, which
+	 * CreateWindowEx reads as screen coordinates: with the taskbar at the top or the left the
+	 * window crept by the taskbar's size on every start. SetWindowPlacement takes them as they
+	 * were saved -- the .ini keeps the same values and meaning as before. Still hidden here. */
+	if (savedPos && hMain)
+	{
+		WINDOWPLACEMENT wpl;
+		ZeroMemory(&wpl, sizeof(wpl));
+		wpl.length = sizeof(wpl);
+		if (GetWindowPlacement(hMain, &wpl))
+		{
+			wpl.flags = 0;
+			wpl.showCmd = SW_HIDE;
+			SetRect(&wpl.rcNormalPosition, wx, wy, wx + ww, wy + wh);
+			SetWindowPlacement(hMain, &wpl);
+		}
+	}
 
 	buildControls();
 	buildMenu(hMain);
@@ -4961,6 +5186,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	ShowWindow(hMain, (iniInt(L"WndMax", 0) && show != SW_SHOWMINNOACTIVE) ? SW_SHOWMAXIMIZED : show);
 	UpdateWindow(hMain);
 	if (updated) setStatusF(ST_OK, S_UPD_UPDATED, APP_VERSION);
+	removeUpdateLeftovers();        /* the setup of the last update, or a download cut short */
 	checkUpdates(0);                /* once a day, unless switched off */
 
 	while (GetMessageW(&msg, NULL, 0, 0) > 0)

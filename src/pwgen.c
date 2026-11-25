@@ -18,12 +18,38 @@
 #define BCRYPT_USE_SYSTEM_PREFERRED_RNG 0x00000002
 #endif
 
-/* A rule set can be possible yet so tight that most draws fail (a 4-character password
- * that needs all four classes from a tiny symbol set accepts about 1 draw in 70). Far more
- * tries than any real setting needs; pw_check() has already ruled out the impossible ones. */
+/* A rule set can be possible yet so tight that most draws fail. pw_check() refuses the ones
+ * that accept fewer than 1 draw in 10^4 (MIN_ACCEPT_LOG2), so the average is at most 10^4
+ * tries and running out of 2,000,000 has a chance of about e^-200. */
 #define MAX_TRIES 2000000
+#define MIN_ACCEPT_LOG2 (-13.2877)      /* log2(1e-4) */
 
 /* ------------------------------------------------------------------ random numbers */
+
+/* Random words are fetched from BCryptGenRandom 64 at a time (one call per 256 bytes instead
+ * of one per word). What is left over is wiped as soon as the password is done (rngWipe). */
+#define RNG_WORDS 64
+static uint32_t rngBuf[RNG_WORDS];
+static int rngLeft;
+
+static int rngWord(uint32_t* x)
+{
+	if (rngLeft == 0)
+	{
+		if (BCryptGenRandom(NULL, (PUCHAR)rngBuf, sizeof(rngBuf), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0)
+			return 0;
+		rngLeft = RNG_WORDS;
+	}
+	*x = rngBuf[--rngLeft];
+	rngBuf[rngLeft] = 0;
+	return 1;
+}
+
+static void rngWipe(void)
+{
+	SecureZeroMemory(rngBuf, sizeof(rngBuf));
+	rngLeft = 0;
+}
 
 /* A uniform integer in [0, n). Values from the top of the 32-bit range that would make
  * the low results more likely are thrown away and drawn again. */
@@ -35,10 +61,20 @@ static int randomBelow(unsigned n, unsigned* out)
 
 	for (;;)
 	{
-		if (BCryptGenRandom(NULL, (PUCHAR)&x, sizeof(x), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0)
-			return 0;
+		if (!rngWord(&x)) return 0;
 		if ((uint64_t)x < limit) { *out = (unsigned)(x % n); return 1; }
 	}
+}
+
+/* A uniform index in [0, n) other than `skip` (skip < 0: any of the n). Always n-1 (or n)
+ * equally likely outcomes, whatever `skip` is: that keeps the draws in makeChars/makePin
+ * uniform over the passwords that follow the rules. */
+static int randomBelowExcept(unsigned n, int skip, unsigned* out)
+{
+	if (skip < 0) return randomBelow(n, out);
+	if (!randomBelow(n - 1, out)) return 0;
+	if ((int)*out >= skip) (*out)++;
+	return 1;
 }
 
 /* ------------------------------------------------------------------ character classes */
@@ -253,6 +289,35 @@ void pw_defaults(PwOptions* o)
 	o->noSequence = 1;
 }
 
+/* log2 of the number of strings makeChars/makePin draw from (each equally likely): the first
+ * character from its allowed set, every other one from the whole set, or from the whole set
+ * but the previous character when repeats are off. The valid passwords over this, i.e.
+ * entropy - support, is the share of draws that are kept. */
+static double charsSupport(const PwOptions* o)
+{
+	Classes c;
+	int len = clampInt(o->length, PW_MIN_LEN, PW_MAX_LEN);
+	int first, rest;
+
+	buildClasses(o, &c);
+	first = lettersRequired(o, &c) ? c.n[C_LOWER] + c.n[C_UPPER] : c.nPool;
+	rest = o->noRepeat ? c.nPool - 1 : c.nPool;
+	if (first <= 0 || rest <= 0) return 0;
+	return log2((double)first) + (len - 1) * log2((double)rest);
+}
+
+static double pinSupport(const PwOptions* o)
+{
+	char dg[16];
+	int len = clampInt(o->pinLength, PW_MIN_LEN, PW_MAX_LEN), nd, rest;
+
+	pinDigits(o, dg);
+	nd = (int)strlen(dg);
+	rest = o->noRepeat ? nd - 1 : nd;
+	if (nd <= 0 || rest <= 0) return 0;
+	return log2((double)nd) + (len - 1) * log2((double)rest);
+}
+
 int pw_check(const PwOptions* o, int* which)
 {
 	if (which) *which = -1;
@@ -262,9 +327,11 @@ int pw_check(const PwOptions* o, int* which)
 	if (o->mode == PW_PIN)
 	{
 		char dg[16];
+		double bits;
 		pinDigits(o, dg);
 		if (!dg[0]) return PW_ERR_NODIGITS;
-		if (pinEntropy(o) <= 0) return PW_ERR_TOOSHORT;
+		if ((bits = pinEntropy(o)) <= 0) return PW_ERR_TOOSHORT;
+		if (bits - pinSupport(o) < MIN_ACCEPT_LOG2) return PW_ERR_TOOTIGHT;
 		return PW_OK;
 	}
 
@@ -280,7 +347,11 @@ int pw_check(const PwOptions* o, int* which)
 			if (!c.n[k]) { if (which) *which = k; return PW_ERR_EMPTYCLASS; }
 		}
 		if (!any) return PW_ERR_NOCLASS;
-		if (charsEntropy(o) <= 0) return PW_ERR_TOOSHORT;
+		{
+			double bits = charsEntropy(o);
+			if (bits <= 0) return PW_ERR_TOOSHORT;
+			if (bits - charsSupport(o) < MIN_ACCEPT_LOG2) return PW_ERR_TOOTIGHT;
+		}
 	}
 	return PW_OK;
 }
@@ -305,36 +376,42 @@ const char* pw_word(int i) { return (i >= 0 && i < WORD_COUNT) ? WORDS[i] : ""; 
 
 /* ------------------------------------------------------------------ drawing passwords */
 
+/* makeChars and makePin return the length, 0 when MAX_TRIES ran out, -1 when the random
+ * number generator failed.
+ *
+ * Why the result is still uniform over every valid password: each draw picks the first
+ * character from a fixed set (the letters when it must be a letter, else the whole pool) and
+ * every later one from the whole pool, or from the pool minus the previous character when
+ * repeats are off -- always the same number of equally likely choices. So every string the
+ * draw can produce has the same probability, the valid passwords among them included, and
+ * keeping only the draws that follow the remaining rules (every class present; no 123 or
+ * 987) leaves each valid password equally likely. Stopping a draw early at its first broken
+ * rule only saves work: that draw would have been thrown away anyway. */
 static int makeChars(const PwOptions* o, char* out)
 {
 	Classes c;
 	int len = clampInt(o->length, PW_MIN_LEN, PW_MAX_LEN), req = 0, k, tries, i;
-	int letterFirst;
+	unsigned nFirst;
 
 	buildClasses(o, &c);
-	letterFirst = lettersRequired(o, &c);
+	/* the letters are the start of the pool (lowercase, then uppercase) */
+	nFirst = lettersRequired(o, &c) ? (unsigned)(c.n[C_LOWER] + c.n[C_UPPER]) : (unsigned)c.nPool;
 	for (k = 0; k < C_COUNT; k++) if (c.n[k]) req |= 1 << k;
 
 	for (tries = 0; tries < MAX_TRIES; tries++)
 	{
-		int seen = 0, good = 1;
+		int seen = 0, prev = -1;
 
 		for (i = 0; i < len; i++)
 		{
 			unsigned j;
-			if (!randomBelow((unsigned)c.nPool, &j)) return 0;
+			if (i == 0 ? !randomBelow(nFirst, &j)
+			           : !randomBelowExcept((unsigned)c.nPool, o->noRepeat ? prev : -1, &j)) return -1;
 			out[i] = c.pool[j];
+			seen |= 1 << c.classOf[(unsigned char)out[i]];
+			prev = (int)j;
 		}
-
-		/* the whole draw is kept or thrown away: uniform over every valid password */
-		for (i = 0; i < len && good; i++)
-		{
-			int cls = c.classOf[(unsigned char)out[i]];
-			seen |= 1 << cls;
-			if (i == 0 && letterFirst && cls != C_LOWER && cls != C_UPPER) good = 0;
-			if (i > 0 && o->noRepeat && out[i] == out[i - 1]) good = 0;
-		}
-		if (good && seen == req) { out[len] = 0; return len; }
+		if (seen == req) { out[len] = 0; return len; }
 	}
 	return 0;
 }
@@ -349,19 +426,20 @@ static int makePin(const PwOptions* o, char* out)
 
 	for (tries = 0; tries < MAX_TRIES; tries++)
 	{
-		int good = 1;
+		int good = 1, prev = -1;
 
-		for (i = 0; i < len; i++)
+		for (i = 0; i < len && good; i++)
 		{
 			unsigned j;
-			if (!randomBelow((unsigned)nd, &j)) return 0;
+			if (i == 0 ? !randomBelow((unsigned)nd, &j)
+			           : !randomBelowExcept((unsigned)nd, o->noRepeat ? prev : -1, &j)) return -1;
 			out[i] = dg[j];
-		}
-		for (i = 1; i < len && good; i++)
-		{
-			int step = out[i] - out[i - 1];
-			if (o->noRepeat && step == 0) good = 0;
-			if (o->noSequence && i >= 2 && (step == 1 || step == -1) && out[i - 1] - out[i - 2] == step) good = 0;
+			prev = (int)j;
+			if (o->noSequence && i >= 2)
+			{
+				int step = out[i] - out[i - 1];
+				if ((step == 1 || step == -1) && out[i - 1] - out[i - 2] == step) good = 0;
+			}
 		}
 		if (good) { out[len] = 0; return len; }
 	}
@@ -403,14 +481,25 @@ static int makeWords(const PwOptions* o, char* out)
 	return len;
 }
 
-int pw_make(const PwOptions* o, char* out)
+int pw_make_ex(const PwOptions* o, char* out, int* why)
 {
-	int n = 0;
+	int n = 0, fail = PW_FAIL_RULES;
 
 	if (pw_check(o, NULL) == PW_OK)
-		n = o->mode == PW_WORDS ? makeWords(o, out) : o->mode == PW_PIN ? makePin(o, out) : makeChars(o, out);
-	if (!n) SecureZeroMemory(out, PW_OUT_MAX);
+	{
+		n = o->mode == PW_WORDS ? (makeWords(o, out) ? (int)strlen(out) : -1)
+		  : o->mode == PW_PIN ? makePin(o, out) : makeChars(o, out);
+		fail = n < 0 ? PW_FAIL_RNG : PW_FAIL_TRIES;
+	}
+	rngWipe();
+	if (n <= 0) { SecureZeroMemory(out, PW_OUT_MAX); n = 0; }
+	if (why) *why = n ? PW_FAIL_NONE : fail;
 	return n;
+}
+
+int pw_make(const PwOptions* o, char* out)
+{
+	return pw_make_ex(o, out, NULL);
 }
 
 int pw_generate(int length, int avoidAmbiguous, char* out)
