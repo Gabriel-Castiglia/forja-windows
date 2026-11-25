@@ -60,12 +60,14 @@ shape from pure chance. Until version 2.1 it was called Wyrmhold.
   (on by default, `CheckUpdates=1|0` in `forja.ini`) does it by itself at most once a day. Only the version is
   asked for: nothing about you or your passwords is sent.
 - When the release is newer, one question: **Update now**, **What's new** (opens the release page) or **Later**.
-- **Update now** downloads `Forja-Setup-<version>.exe` and `SHA256SUMS.txt` from the release and compares the
-  SHA-256; if it does not match, the file is deleted and never run. Then Forja closes (a copy waiting to be
+- **Update now** first checks that the release's `SHA256SUMS.txt` carries the author's signature (`release.sig`,
+  checked against two keys built into Forja); a release without a valid one installs nothing and can only be
+  downloaded by hand from its page. Then it downloads `Forja-Setup-<version>.exe` and compares the SHA-256; if it
+  does not match, the file is deleted and never run. Then Forja closes (a copy waiting to be
   wiped goes), the setup runs with `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`, keeping the install folder,
   language and tasks chosen before, waits for Forja to have exited and starts it again.
 - A **portable** copy (not the one the setup installed) cannot update itself: it offers the download page.
-- Releases must therefore carry the setup and a `SHA256SUMS.txt` (`hash  file name` per line).
+- Releases must therefore carry the setup, a `SHA256SUMS.txt` (`hash  file name` per line) and its `release.sig`.
 
 **Download:** the setup is in [Releases](https://github.com/Gabriel-Castiglia/forja-windows/releases/latest).
 
@@ -154,8 +156,10 @@ Hasta la versión 2.1 se llamaba Wyrmhold.
   solo, como mucho una vez por día. Solo se pide la versión: no se envía nada sobre vos ni tus contraseñas.
 - Si la versión publicada es más nueva, una sola pregunta: **Actualizar ahora**, **Ver novedades** (abre la página
   de la versión) o **Más tarde**.
-- **Actualizar ahora** descarga `Forja-Setup-<versión>.exe` y `SHA256SUMS.txt` de la versión publicada y compara
-  el SHA-256; si no coincide, el archivo se borra y nunca se ejecuta. Después Forja se cierra (lo copiado que
+- **Actualizar ahora** comprueba primero que el `SHA256SUMS.txt` de la versión publicada lleve la firma del autor
+  (`release.sig`, que se comprueba con dos claves que trae Forja); una versión sin firma válida no instala nada y
+  solo se puede bajar a mano desde su página. Después descarga `Forja-Setup-<versión>.exe` y compara el SHA-256; si
+  no coincide, el archivo se borra y nunca se ejecuta. Después Forja se cierra (lo copiado que
   esperaba borrarse se borra), el instalador corre con `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`, conservando la
   carpeta, el idioma y las tareas elegidos antes, espera a que Forja haya terminado y lo vuelve a abrir.
 - Una copia **portable** (no la que instaló el instalador) no puede actualizarse sola: ofrece abrir la página de descarga.

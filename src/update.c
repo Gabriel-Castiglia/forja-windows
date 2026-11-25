@@ -188,6 +188,7 @@ int upd_parse_release(const char* json, UpdRelease* r)
 			strcpy(r->setupName, name);
 		}
 		else if (!_stricmp(name, UPD_SUMS_NAME)) strcpy(r->sumsUrl, url);
+		else if (!_stricmp(name, UPD_SIG_NAME)) strcpy(r->sigUrl, url);
 	}
 	return r->tag[0] != 0;
 }
@@ -345,6 +346,83 @@ int upd_installed_copy(void)
 	return 0;
 }
 
+/* ------------------------------------------------------------------ the author's signature */
+
+/* X||Y of each public key (P-256), in base64: the author's PC, the author's Mac. */
+static const char* const RELEASE_KEYS[] = {
+	"A6RpVoY34Wts4tIWkpmbD8BsdZrjb8GXnlS79HO90GfcAPr+dCWy96twq4qxdU8uWPDcJmgyp1UJIc2hLUbEiw==",
+	"NE/n9pyImBDUa2NzbD1Yj1H8sVFtEyS4ohI5rWthYucqnl/jJLAin9GpIB6+HC0LCNDGPLx4CF8Crp77+6123g==",
+};
+
+/* Base64 into out (at most cap bytes); spaces and line breaks around it are ignored. The number of
+ * bytes, or -1 for anything that is not base64 or does not fit. */
+static int unbase64(const char* s, BYTE* out, int cap)
+{
+	int n = 0, bits = 0, pad = 0;
+	unsigned acc = 0;
+
+	while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
+	for (; *s; s++)
+	{
+		int v;
+		char ch = *s;
+		if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') break;
+		if (ch == '=') { pad++; continue; }
+		if (pad) return -1;                         /* nothing after the padding */
+		if (ch >= 'A' && ch <= 'Z') v = ch - 'A';
+		else if (ch >= 'a' && ch <= 'z') v = ch - 'a' + 26;
+		else if (ch >= '0' && ch <= '9') v = ch - '0' + 52;
+		else if (ch == '+') v = 62;
+		else if (ch == '/') v = 63;
+		else return -1;
+		acc = (acc << 6) | (unsigned)v;
+		bits += 6;
+		if (bits >= 8)
+		{
+			bits -= 8;
+			if (n >= cap) return -1;
+			out[n++] = (BYTE)(acc >> bits);
+		}
+	}
+	for (; *s; s++) if (*s != ' ' && *s != '\t' && *s != '\r' && *s != '\n') return -1;
+	if (pad > 2) return -1;
+	return n;
+}
+
+static int verifyWithKey(const BYTE hash[32], const BYTE sig[64], const char* keyB64)
+{
+	BCRYPT_ALG_HANDLE alg = NULL;
+	BCRYPT_KEY_HANDLE key = NULL;
+	BYTE blob[sizeof(BCRYPT_ECCKEY_BLOB) + 64];
+	BCRYPT_ECCKEY_BLOB* head = (BCRYPT_ECCKEY_BLOB*)blob;
+	int ok = 0;
+
+	if (unbase64(keyB64, blob + sizeof(BCRYPT_ECCKEY_BLOB), 64) != 64) return 0;
+	head->dwMagic = BCRYPT_ECDSA_PUBLIC_P256_MAGIC;
+	head->cbKey = 32;
+	if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_ECDSA_P256_ALGORITHM, NULL, 0) != 0) return 0;
+	if (BCryptImportKeyPair(alg, NULL, BCRYPT_ECCPUBLIC_BLOB, &key, blob, sizeof(blob), 0) == 0)
+	{
+		/* CNG takes an ECDSA signature as r||s, which is what release.sig holds */
+		ok = BCryptVerifySignature(key, NULL, (PUCHAR)hash, 32, (PUCHAR)sig, 64, 0) == 0;
+		BCryptDestroyKey(key);
+	}
+	BCryptCloseAlgorithmProvider(alg, 0);
+	return ok;
+}
+
+int upd_signature_valid(const void* data, size_t n, const char* sig)
+{
+	BYTE s[64], hash[32];
+	size_t k;
+
+	if (!data || !sig || unbase64(sig, s, sizeof(s)) != 64) return 0;
+	if (!upd_sha256(data, n, hash)) return 0;
+	for (k = 0; k < sizeof(RELEASE_KEYS) / sizeof(RELEASE_KEYS[0]); k++)
+		if (verifyWithKey(hash, s, RELEASE_KEYS[k])) return 1;
+	return 0;
+}
+
 /* ------------------------------------------------------------------ known answers */
 
 static int gFails;
@@ -367,6 +445,7 @@ int upd_selftest(FILE* log)
 		"\"tag_name\": \"v9.9.9\",\"assets\":[{\"name\":\"SHA256SUMS.txt\",\"browser_download_url\":"
 		"\"https://github.com/o/r/releases/download/v9.9.9/SHA256SUMS.txt\"},{\"name\":\"Forja-Setup-9.9.9.exe\","
 		"\"browser_download_url\": \"https://github.com/o/r/releases/download/v9.9.9/Forja-Setup-9.9.9.exe\"},"
+		"{\"name\":\"release.sig\",\"browser_download_url\":\"https://github.com/o/r/releases/download/v9.9.9/release.sig\"},"
 		"{\"name\":\"bad\",\"browser_download_url\":\"https://github.com/o/r/releases/download/v9.9.9/Forja-Setup-..%5c.exe\"}]}";
 	static const BYTE abc[32] = { 0xba,0x78,0x16,0xbf,0x8f,0x01,0xcf,0xea,0x41,0x41,0x40,0xde,0x5d,0xae,0x22,0x23,
 	                              0xb0,0x03,0x61,0xa3,0x96,0x17,0x7a,0x9c,0xb4,0x10,0xff,0x61,0xf2,0x00,0x15,0xad };
@@ -401,9 +480,31 @@ int upd_selftest(FILE* log)
 	            !strcmp(r.setupUrl, "https://github.com/o/r/releases/download/v9.9.9/Forja-Setup-9.9.9.exe"),
 	            "release JSON: the setup asset (an unsafe file name is ignored)");
 	expect(log, !strcmp(r.sumsUrl, "https://github.com/o/r/releases/download/v9.9.9/SHA256SUMS.txt"), "release JSON: SHA256SUMS.txt");
+	expect(log, !strcmp(r.sigUrl, "https://github.com/o/r/releases/download/v9.9.9/release.sig"), "release JSON: release.sig");
 	expect(log, !upd_parse_release("{\"message\":\"Not Found\"}", &r), "release JSON: no tag, no release");
 
 	expect(log, upd_sha256("abc", 3, d) && !memcmp(d, abc, 32), "SHA-256 of \"abc\" (FIPS 180-2 example)");
+
+	/* release.sig: real signatures by the author's two keys (the PC's, the Mac's) of the same bytes, as in
+	 * the self-tests of Vigía, Muelle and Haul; any change is refused */
+	{
+		static const char signedSums[] =
+			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789ABCDEF  Vigia-Setup-9.9.9.exe\n"
+			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff *Vigia_Manual_EN.pdf\n";
+		static const char pcSig[] = "rEEKYRSXLO7VKbID/El7ZkFBh1uKIPNS38KopNSZ6DEm7knfIUjxch9kmv8xfREc6bLKka+bePFZ1BKzO+15ww==\n";
+		static const char macSig[] = "K8+3h6FgPjn2ZyH3HsLWof4obfKfyW00p3YKE9WQFoEF+umfN6/OMxMQNrQbc3XqkKrZSz3QexCBIZEMrdrvKg==";
+		char changed[sizeof(signedSums)];
+		size_t n = sizeof(signedSums) - 1;
+
+		memcpy(changed, signedSums, sizeof(signedSums));
+		changed[0] ^= 1;
+		expect(log, upd_signature_valid(signedSums, n, pcSig), "signature: the PC's key");
+		expect(log, upd_signature_valid(signedSums, n, macSig), "signature: the Mac's key");
+		expect(log, !upd_signature_valid(changed, n, pcSig) && !upd_signature_valid(changed, n, macSig),
+		       "signature: one byte changed is refused");
+		expect(log, !upd_signature_valid(signedSums, n, "") && !upd_signature_valid(signedSums, n, "not base64!")
+		            && !upd_signature_valid(signedSums, n, "QUJD"), "signature: empty, not base64 or too short is refused");
+	}
 
 	return gFails;
 }

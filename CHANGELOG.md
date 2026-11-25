@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.2 — 2026-11-25
+
+- **Updates signed by the author**: the `SHA256SUMS.txt` of a release must now carry the author's signature
+  (`release.sig`, ECDSA P-256, checked with Windows' own cryptography against two keys built into Forja) before the
+  setup is downloaded. Before, the setup was checked only against hashes from the same page, so a release put there
+  by someone else would have installed itself. A release without a valid signature is offered as a page, to download
+  by hand. Anyone can still download, install and share Forja; Forja 3.0.1 and older install this one as usual.
+
 ## 3.0.1 — 2026-11-25
 
 - Generate no longer freezes the window with very tight rules (for example only digits, no repeats and a length of

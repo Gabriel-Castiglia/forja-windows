@@ -21,12 +21,14 @@
 #define UPD_API_URL   L"https://api.github.com/repos/Gabriel-Castiglia/forja-windows/releases/latest"
 #define UPD_SETUP_PREFIX "Forja-Setup-"
 #define UPD_SUMS_NAME    "SHA256SUMS.txt"
+#define UPD_SIG_NAME     "release.sig"
 
 /* What the latest release offers. Empty strings for what it lacks. */
 typedef struct {
 	char tag[64];                       /* as published, e.g. "v2.1.0" */
 	char setupUrl[1024], setupName[128];
 	char sumsUrl[1024];
+	char sigUrl[1024];                  /* release.sig: the author's signature of SHA256SUMS.txt */
 } UpdRelease;
 
 /* Receives the body of a download, piece by piece; returns 0 to stop. */
@@ -51,6 +53,12 @@ DWORD upd_http_get(const wchar_t* url, const wchar_t* agent, const wchar_t* acce
 /* SHA-256 of a buffer (32 bytes out) and of a file (64 lowercase hex digits out). 1 = done. */
 int upd_sha256(const void* data, size_t n, BYTE out[32]);
 int upd_sha256_file(const wchar_t* path, char out[65]);
+
+/* 1 when `sig` (the text of release.sig: base64 of r||s, 64 bytes) is a valid ECDSA P-256 / SHA-256
+ * signature of exactly the n bytes of `data` by one of the author's two keys (the same two keys as
+ * ReleaseSignature.cs of the author's other Windows apps: the PC's and the Mac's). An update is
+ * downloaded only when its SHA256SUMS.txt passes this. */
+int upd_signature_valid(const void* data, size_t n, const char* sig);
 
 /* The same through a handle already open (read from the start). */
 int upd_sha256_handle(HANDLE f, char out[65]);

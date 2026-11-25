@@ -29,7 +29,8 @@
       to 60 min in the .ini or on the command line; or never) or on exit,
       whichever comes first -- only if the clipboard still holds exactly what we put there;
     - Help -> Check for updates (and once a day by itself): one question, then the setup is
-      downloaded, checked against the release's SHA256SUMS.txt, run in silence, and the
+      downloaded (only when the release's SHA256SUMS.txt carries the author's signature,
+      release.sig), checked against that SHA256SUMS.txt, run in silence, and the
       program comes back (see "updates" below and update.c);
     - light, dark or follow-Windows theme and twelve accent colours (View -> Theme and
       colour), which also tint the icon;
@@ -3546,9 +3547,10 @@ static void setLanguage(int lang)
 /* ------------------------------------------------------------------ updates */
 
 /* Help -> Check for updates (and once a day by itself), as in the sister program Gryphmark:
- * when GitHub has a newer release, one question, and then everything happens alone. The setup
- * is downloaded and checked against the release's SHA256SUMS.txt (a file that does not match
- * is deleted, never run); the window closes (a copy waiting to be wiped goes, as on any exit);
+ * when GitHub has a newer release, one question, and then everything happens alone. The
+ * release's SHA256SUMS.txt must carry the author's signature (release.sig, update.c
+ * upd_signature_valid; without it nothing is downloaded), the setup is downloaded and checked
+ * against that list (a file that does not match is deleted, never run); the window closes (a copy waiting to be wiped goes, as on any exit);
  * the setup runs in silence keeping the install options, waits for this process to be gone
  * (/WHWAITPID) and starts the program again (/WHRELAUNCH, see installer/Forja.iss). A
  * portable copy cannot be installed over: it is offered the download page. The network work
@@ -3721,7 +3723,25 @@ static DWORD WINAPI downloadThread(void* arg)
 	m.p[0] = 0;
 	MultiByteToWideChar(CP_UTF8, 0, j->rel.sumsUrl, -1, url, 1024);
 	j->err = upd_http_get(url, UPD_AGENT, NULL, 30000, sinkMem, &m);
-	if (!j->err && !upd_hash_for(m.p, j->rel.setupName, want)) j->errStr = S_UPD_NOHASH;
+	/* the author's signature of the list first (release.sig): without a valid one nothing is
+	 * downloaded or run, so a release someone else put on the page never installs itself */
+	if (!j->err)
+	{
+		MemSink sg;
+		sg.cap = 1024;
+		sg.n = 0;
+		sg.p = (char*)malloc(sg.cap);
+		if (!sg.p) j->err = ERROR_OUTOFMEMORY;
+		else
+		{
+			sg.p[0] = 0;
+			MultiByteToWideChar(CP_UTF8, 0, j->rel.sigUrl, -1, url, 1024);
+			j->err = upd_http_get(url, UPD_AGENT, NULL, 30000, sinkMem, &sg);
+			if (!j->err && !upd_signature_valid(m.p, m.n, sg.p)) j->errStr = S_UPD_BADSIG;
+			free(sg.p);
+		}
+	}
+	if (!j->err && !j->errStr && !upd_hash_for(m.p, j->rel.setupName, want)) j->errStr = S_UPD_NOHASH;
 	free(m.p);
 
 	if (!j->err && !j->errStr)
@@ -3898,7 +3918,7 @@ static void onUpdateDone(UpdJob* j)
 			}
 		}
 		else if (!upd_installed_copy()) offerPage(S_UPD_PORTABLE, bare);
-		else if (!j->rel.setupUrl[0] || !j->rel.sumsUrl[0]) offerPage(S_UPD_AVAILABLE, bare);   /* no setup or hashes */
+		else if (!j->rel.setupUrl[0] || !j->rel.sumsUrl[0] || !j->rel.sigUrl[0]) offerPage(S_UPD_AVAILABLE, bare);   /* no setup, hashes or signature */
 		else
 		{
 			int r = askUpdate(bare);
