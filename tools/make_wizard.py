@@ -4,11 +4,11 @@ Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only
 Date: November 10, 2026
 SPDX-License-Identifier: GPL-2.0-only
 
-The side panel: the icon's engraving on the default black, a soft glow of the forge's fire
+The side panel: the icon's drawing on the default black, a soft glow of the forge's fire
 behind it, the name and a line in the three languages' common script (Latin). The small
 picture at the top right of the inner pages: the icon. Both at twice the base size (Inno
 Setup scales them down on ordinary screens and keeps them sharp on high-DPI ones).
-Run after tools/make_icon.py:  python tools/make_wizard.py   (needs Pillow, numpy)
+Run after the icon is drawn (assets/app256.png):  python tools/make_wizard.py   (needs Pillow, numpy)
 """
 from pathlib import Path
 

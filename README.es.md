@@ -98,7 +98,8 @@ Probado con: Windows 11 Pro x64, MSYS2 con mingw-w64 GCC 16.2.0 (paquete 16.2.0-
 Inno Setup 6.7.3, Python 3.13.17 con python-docx 1.2.0 (guías), Pillow 12.3.0, numpy 2.5.4, scipy 1.18.1 y
 opencv-python 5.0.0.93 (ícono e imágenes del instalador), LibreOffice 26.8.2.2 (guías a PDF).
 
-El ícono y las imágenes del instalador los dibujan `tools/make_icon.py` y `tools/make_wizard.py`; el encabezado
+El ícono sale de `assets/icon.svg` (en todos los colores, con la herramienta de íconos del autor) y las imágenes del
+instalador las dibuja `tools/make_wizard.py`; el encabezado
 con la lista de palabras, `tools/make_wordlist.py` a partir de `assets/eff_large_wordlist.txt`.
 
 ### Verificaciones
@@ -124,5 +125,4 @@ Software libre bajo la **Licencia Pública General de GNU, versión 2 únicament
 
 © 2026 Gabriel Castiglia. C puro y la API Win32, sin código de terceros.
 Palabras de las frases: la lista grande de la EFF, Electronic Frontier Foundation, CC BY 3.0 US (eff.org/dice).
-Ícono: el yunque y los martillos de la tarjeta de Elwell and Taylor, herreros de Londres (c. 1766), British Museum,
-de dominio público.
+Ícono: un yunque y un martillo dibujados para Forja (2026), bajo la GPL-2.0 como el resto.

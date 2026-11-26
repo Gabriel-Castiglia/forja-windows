@@ -2,6 +2,12 @@
 
 [English](CHANGELOG.md) · **Español** · [日本語](CHANGELOG.ja.md)
 
+## 3.1.2 — 2026-11-27
+
+- **Ícono nuevo**: un yunque y un martillo dibujados planos, en crema con contorno negro sobre el cuadrado del color
+  elegido, con tres chispas. Reemplaza al grabado de una tarjeta comercial del siglo XVIII y sigue el color elegido en
+  *Ver → Tema y color*; también lo usan las imágenes del instalador. El dibujo está en `assets/icon.svg`.
+
 ## 3.1.1 — 2026-11-26
 
 - La barra de menús conserva su color después de abrir una lista desplegable (perfil, símbolos, separador, tiempo

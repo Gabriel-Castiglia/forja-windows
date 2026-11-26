@@ -92,7 +92,8 @@ Tested with: Windows 11 Pro x64, MSYS2 with mingw-w64 GCC 16.2.0 (package 16.2.0
 Inno Setup 6.7.3, Python 3.13.17 with python-docx 1.2.0 (guides), Pillow 12.3.0, numpy 2.5.4, scipy 1.18.1 and
 opencv-python 5.0.0.93 (icon and setup pictures), LibreOffice 26.8.2.2 (guides to PDF).
 
-The icon and the setup pictures are drawn by `tools/make_icon.py` and `tools/make_wizard.py`; the word list
+The icon is drawn from `assets/icon.svg` (in every colour, by the author's icon tool) and the setup pictures by
+`tools/make_wizard.py`; the word list
 header by `tools/make_wordlist.py` from `assets/eff_large_wordlist.txt`.
 
 ### Checks
@@ -116,4 +117,4 @@ Free software under the **GNU General Public License, version 2 only** (GPL-2.0-
 
 © 2026 Gabriel Castiglia. Plain C and the Win32 API, no third-party code.
 Passphrase words: the EFF large word list, Electronic Frontier Foundation, CC BY 3.0 US (eff.org/dice).
-Icon: the anvil and hammers of the trade card of Elwell and Taylor, smiths of London (c. 1766), British Museum, public domain.
+Icon: an anvil and hammer drawn for Forja (2026), under the GPL-2.0 like the rest.

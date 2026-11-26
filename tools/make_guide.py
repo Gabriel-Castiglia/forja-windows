@@ -126,7 +126,7 @@ GUIDES = {
             ("h", "14. License and credits"),
             ("p", "Free software under the GNU General Public License, version 2 (GPL-2.0-only): you may use, copy, study and change it, and anyone who passes it on must do so under the same license, with the source code. It comes with no warranty. The full text is in LICENSE.txt. \u00A9 2026 Gabriel Castiglia."),
             ("p", "Source code, releases and updates: https://" + REPO),
-            ("p", "Passphrase words: the EFF large word list, by the Electronic Frontier Foundation, under CC BY 3.0 US (eff.org/dice). Icon: the anvil and hammers of the trade card of Elwell and Taylor, smiths of London (c. 1766), British Museum, public domain."),
+            ("p", "Passphrase words: the EFF large word list, by the Electronic Frontier Foundation, under CC BY 3.0 US (eff.org/dice). Icon: an anvil and hammer drawn for Forja (2026), under the GPL-2.0 like the rest."),
         ],
     },
     "jp": {
@@ -193,7 +193,7 @@ GUIDES = {
             ("h", "14. ライセンスとクレジット"),
             ("p", "GNU 一般公衆利用許諾書 第 2 版(GPL-2.0-only)のもとで配布されるフリーソフトウェアです。使用・複製・研究・改変ができ、再配布する場合は同じライセンスでソースコードとともに行う必要があります。無保証です。全文は LICENSE.txt にあります。\u00A9 2026 Gabriel Castiglia。"),
             ("p", "ソースコード・リリース・更新: https://" + REPO),
-            ("p", "パスフレーズの単語:Electronic Frontier Foundation の EFF large word list(CC BY 3.0 US、eff.org/dice)。アイコン: ロンドンの鍛冶屋 Elwell and Taylor の商用カード(1766 年ごろ、大英博物館、パブリックドメイン)の金床と槌。"),
+            ("p", "パスフレーズの単語:Electronic Frontier Foundation の EFF large word list(CC BY 3.0 US、eff.org/dice)。アイコン: Forja のために描いた金床と槌 (2026)。ほかと同じく GPL-2.0。"),
         ],
     },
     "es": {
@@ -260,7 +260,7 @@ GUIDES = {
             ("h", "14. Licencia y créditos"),
             ("p", "Software libre bajo la Licencia Pública General de GNU, versión 2 (GPL-2.0-only): podés usarlo, copiarlo, estudiarlo y modificarlo, y quien lo redistribuya debe hacerlo bajo la misma licencia, con el código fuente. Se ofrece sin garantía. El texto completo está en LICENSE.txt. \u00A9 2026 Gabriel Castiglia."),
             ("p", "Código fuente, versiones y actualizaciones: https://" + REPO),
-            ("p", "Palabras de las frases: la lista grande de la EFF, de la Electronic Frontier Foundation, bajo CC BY 3.0 US (eff.org/dice). Ícono: el yunque y los martillos de la tarjeta de Elwell and Taylor, herreros de Londres (c. 1766), British Museum, de dominio público."),
+            ("p", "Palabras de las frases: la lista grande de la EFF, de la Electronic Frontier Foundation, bajo CC BY 3.0 US (eff.org/dice). Ícono: un yunque y un martillo dibujados para Forja (2026), bajo la GPL-2.0 como el resto."),
         ],
     },
 }

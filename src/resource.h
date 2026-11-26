@@ -14,7 +14,7 @@
 #define RESOURCE_H
 
 #define IDI_APP          101
-#define IDR_ICONLAYER    102     /* the icon drawing without its tile colour (make_icon.py) */
+#define IDR_ICONLAYER    102     /* the icon drawing without its tile colour (from assets/icon.svg) */
 
 #define IDM_GENERATE     301
 #define IDM_COPY         302

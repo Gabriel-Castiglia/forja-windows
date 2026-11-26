@@ -373,8 +373,8 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"exist only in this window until you copy or save them.",
 	[S_ABOUT_AUTHOR]   = L"Author: %ls",
 	[S_ABOUT_CREDITS]  = L"Passphrase words: the EFF large word list, by the Electronic Frontier "
-	                     L"Foundation, under CC BY 3.0 US (eff.org/dice). Icon: the anvil and hammers of the trade card "
-	                     L"of Elwell and Taylor, smiths of London (c. 1766), British Museum, public domain.",
+	                     L"Foundation, under CC BY 3.0 US (eff.org/dice). Icon: an anvil and hammer drawn for Forja "
+	                     L"(2026), under the GPL-2.0 like the rest.",
 	[S_ABOUT_LICENSE]  = L"Free software under the GNU General Public License, version 2 (GPL-2.0-only). "
 	                     L"It comes with no warranty. \x00A9 2026 Gabriel Castiglia.",
 },
@@ -675,8 +675,8 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"送信されません。パスワードは、コピーまたは保存するまでこのウィンドウの中にだけ存在します。",
 	[S_ABOUT_AUTHOR]   = L"作成者: %ls",
 	[S_ABOUT_CREDITS]  = L"パスフレーズの単語: Electronic Frontier Foundation の EFF large word list"
-	                     L"(CC BY 3.0 US、eff.org/dice)。アイコン: ロンドンの鍛冶屋 Elwell and Taylor の商用カード"
-	                     L"(1766 年ごろ、大英博物館、パブリックドメイン)の金床と槌。",
+	                     L"(CC BY 3.0 US、eff.org/dice)。アイコン: Forja のために描いた金床と槌 (2026)。"
+	                     L"ほかと同じく GPL-2.0。",
 	[S_ABOUT_LICENSE]  = L"GNU 一般公衆利用許諾書 第2版 (GPL-2.0-only) のもとで配布されるフリーソフトウェアです。"
 	                     L"無保証です。\x00A9 2026 Gabriel Castiglia。",
 },
@@ -980,8 +980,8 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"hasta que las copiás o guardás.",
 	[S_ABOUT_AUTHOR]   = L"Autor: %ls",
 	[S_ABOUT_CREDITS]  = L"Palabras de las frases: la lista grande de EFF, de la Electronic Frontier Foundation, "
-	                     L"bajo CC BY 3.0 US (eff.org/dice). Ícono: el yunque y los martillos de la tarjeta de Elwell and "
-	                     L"Taylor, herreros de Londres (c. 1766), British Museum, de dominio público.",
+	                     L"bajo CC BY 3.0 US (eff.org/dice). Ícono: un yunque y un martillo dibujados para Forja (2026), "
+	                     L"bajo la GPL-2.0 como el resto.",
 	[S_ABOUT_LICENSE]  = L"Software libre bajo la Licencia Pública General de GNU, versión 2 (GPL-2.0-only). "
 	                     L"Se ofrece sin garantía. \x00A9 2026 Gabriel Castiglia.",
 },

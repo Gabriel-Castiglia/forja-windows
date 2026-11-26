@@ -153,8 +153,8 @@ void applyTheme(HWND hwnd)
 
 /* ------------------------------------------------------------------ the icon, in the accent */
 
-/* The icon: the engraving (anvil and hammers) laid on a rounded tile of the accent's colour.
- * The drawing comes without the tile as resource IDR_ICONLAYER (tools/make_icon.py): 256 x 256
+/* The icon: the drawing (anvil and hammer) laid on a rounded tile of the accent's colour.
+ * The drawing comes without the tile as resource IDR_ICONLAYER (from assets/icon.svg): 256 x 256
  * pixels of T, K, R, G, B, where the pixel is rgb = RGB + tile * K / 255 with alpha T,
  * premultiplied. Here it is coloured, reduced to the size asked by averaging the area each
  * pixel covers, and turned into an icon. Without the resource, the executable's own icon. */

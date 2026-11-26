@@ -4,7 +4,7 @@
   Date: November 9, 2026
   SPDX-License-Identifier: GPL-2.0-only
 
-  The icon (drawn by tools/make_icon.py), the keyboard accelerators, the version block,
+  The icon (drawn from assets/icon.svg), the keyboard accelerators, the version block,
   and the manifest (themed common controls, per-monitor DPI aware).
 **/
 

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+      <rect x="100" y="100" width="824" height="824" rx="185" fill="#22242C"/>
+      <g stroke="#111" stroke-width="22" stroke-linejoin="round" stroke-linecap="round">
+        <!-- anvil: face, horn, waist, feet -->
+        <path d="M352 520 H 760 V 584 H 664 Q 604 596 596 660 L 588 700 H 470 L 462 660 Q 454 596 394 584 H 352 Q 262 584 196 532 Q 246 520 352 520 Z" fill="#EEE8DA"/>
+        <path d="M424 700 H 634 L 668 742 V 790 H 390 V 742 Z" fill="#EEE8DA"/>
+        <line x1="352" y1="584" x2="394" y2="584"/>
+        <!-- hammer -->
+        <g transform="rotate(-38 610 360)">
+          <rect x="598" y="300" width="36" height="250" rx="10" fill="#B9845A"/>
+          <rect x="536" y="226" width="160" height="88" rx="10" fill="#EEE8DA"/>
+          <line x1="562" y1="226" x2="562" y2="314" stroke-width="10"/>
+        </g>
+      </g>
+      <!-- sparks: three short strokes from the face -->
+      <g stroke="#F2B544" stroke-width="16" stroke-linecap="round">
+        <line x1="468" y1="470" x2="440" y2="416"/>
+        <line x1="420" y1="488" x2="364" y2="452"/>
+        <line x1="508" y1="460" x2="502" y2="398"/>
+      </g>
+    </svg>

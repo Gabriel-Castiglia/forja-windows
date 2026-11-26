@@ -2,6 +2,12 @@
 
 **English** · [Español](CHANGELOG.es.md) · [日本語](CHANGELOG.ja.md)
 
+## 3.1.2 — 2026-11-27
+
+- **A new icon**: an anvil and a hammer drawn as a flat picture, cream with a black outline on the tile of the chosen
+  colour, with three sparks. It replaces the engraving of an 18th-century trade card, and still follows the colour
+  chosen in *View → Theme and colour*; the setup pictures use it too. The drawing is in `assets/icon.svg`.
+
 ## 3.1.1 — 2026-11-26
 
 - The menu bar keeps its colour after a drop-down list (profile, symbols, separator, clipboard time) has been

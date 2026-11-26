@@ -65,7 +65,7 @@ rem -> out\Forja-Setup-<version>.exe
 Inno Setup 6.7.3、Python 3.13.17 と python-docx 1.2.0(ガイド)、Pillow 12.3.0、numpy 2.5.4、scipy 1.18.1、
 opencv-python 5.0.0.93(アイコンとセットアップの画像)、LibreOffice 26.8.2.2(ガイドの PDF 化)。
 
-アイコンとセットアップの画像は `tools/make_icon.py` と `tools/make_wizard.py` が描き、単語リストのヘッダーは
+アイコンは `assets/icon.svg` から(作者のアイコン ツールで全色)、セットアップの画像は `tools/make_wizard.py` が描き、単語リストのヘッダーは
 `tools/make_wordlist.py` が `assets/eff_large_wordlist.txt` から作ります。
 
 ### 検証
@@ -89,4 +89,4 @@ opencv-python 5.0.0.93(アイコンとセットアップの画像)、LibreOffice
 
 © 2026 Gabriel Castiglia. C と Win32 API のみ、サードパーティのコードはありません。
 パスフレーズの単語: Electronic Frontier Foundation の EFF large word list(CC BY 3.0 US、eff.org/dice)。
-アイコン: ロンドンの鍛冶屋 Elwell and Taylor の商用カード(1766 年ごろ、大英博物館、パブリックドメイン)の金床と槌。
+アイコン: Forja のために描いた金床と槌 (2026)。ほかと同じく GPL-2.0。
