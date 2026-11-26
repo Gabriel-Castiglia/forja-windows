@@ -30,10 +30,14 @@ shape from pure chance. Until version 2.1 it was called Wyrmhold.
   cloud clipboard, and **wiped after 2 minutes** (10 s to 10 min in the window, or never) or as soon as the program
   closes — only if the clipboard still holds exactly what Forja put there, so whatever you copied afterwards is
   left alone. See [Clipboard](#clipboard).
-- **Updates that install themselves:** Help → Check for updates, and once a day by itself (can be switched off).
-  One question — Update now, What's new or Later — and then the setup is downloaded, checked against the
-  release's `SHA256SUMS.txt` (a file that does not match is deleted, never run), installed in silence with the
-  same options, and Forja opens again. A portable copy only offers the download page. See [Updates](#updates).
+- **Updates that install themselves:** Help → Check for updates, and once a day by itself if you say yes when Forja
+  first starts (can be switched off). One question — Update now, What's new or Later — and then the setup is
+  downloaded only if the release carries the author's signature, checked against the release's `SHA256SUMS.txt`
+  (a file that does not match is deleted, never run), installed in silence with the same options, and Forja opens
+  again. A portable copy only offers the download page. See [Updates](#updates).
+- **Accessible:** Narrator and other screen readers name every control, with the state of switches, chips and
+  modes, the value of the slider, the passwords of the list and the menus, and read the status line out as it
+  changes. Sharp on every screen: moved to a screen with another scale, the window is drawn again at that scale.
 - English, Japanese and Spanish; light, dark or as-Windows theme and twelve colours, which also colour the icon.
 - **Setup** in the three languages, per user with no administrator rights, with a clean uninstaller. Or portable:
   a single static `forja.exe` with an empty `forja.ini` beside it.
@@ -57,8 +61,12 @@ shape from pure chance. Until version 2.1 it was called Wyrmhold.
 ### Updates
 
 - **Help → Check for updates…** asks `api.github.com` for the latest release; **Help → Check for updates daily**
-  (on by default, `CheckUpdates=1|0` in `forja.ini`) does it by itself at most once a day. Only the version is
-  asked for: nothing about you or your passwords is sent.
+  (`CheckUpdates=1|0` in `forja.ini`) does it by itself at most once a day. Only the version is asked for: nothing
+  about you or your passwords is sent.
+- On the first start (no `CheckUpdates` in `forja.ini` yet, also when coming from 3.0 or older) Forja asks once
+  whether to check daily, before asking GitHub anything. The answer is saved; closing the question without an
+  answer saves nothing, checks nothing that time and asks again on the next start. A start by the setup after an
+  update keeps the daily check on, without asking.
 - When the release is newer, one question: **Update now**, **What's new** (opens the release page) or **Later**.
 - **Update now** first checks that the release's `SHA256SUMS.txt` carries the author's signature (`release.sig`,
   checked against two keys built into Forja); a release without a valid one installs nothing and can only be
@@ -100,7 +108,7 @@ header by `tools/make_wordlist.py` from `assets/eff_large_wordlist.txt`.
 | Script | What it proves |
 |---|---|
 | `tools/run_checks.ps1` | The generator follows the rules, over several hundred thousand passwords. The checker is calibrated first: a correct file must pass and five spoiled copies must fail. Then it runs `forja.exe /selftest:<log>` (below). |
-| `forja.exe /selftest:<log>` | About five seconds, no window: the clipboard wiping (wiped when the time is up, a later copy by another program left alone, exactly the same text still wiped, wiped on exit, nothing wiped with clearing off, history exclusion formats), the clipboard settings and `/clearafter` in a throw-away `.ini`, and the update's pure functions (version comparison, `SHA256SUMS.txt` lookup, release JSON, SHA-256). Your clipboard is saved first and put back; your settings are never touched. Exit code = failures. |
+| `forja.exe /selftest:<log>` | About five seconds, no window: the clipboard wiping (wiped when the time is up, a later copy by another program left alone, exactly the same text still wiped, wiped on exit, nothing wiped with clearing off, history exclusion formats), the clipboard settings and `/clearafter` in a throw-away `.ini`, and the update's pure functions (version comparison, `SHA256SUMS.txt` lookup, release JSON, SHA-256, the author's signature). Your clipboard is saved first and put back; your settings are never touched. Exit code = failures. |
 | `tools/check_options.py` | Every option (character sets, exclusions, no repeats, first letter, PIN runs, passphrase separators) over thousands of passwords, and the exact entropy against an independent count. Calibrated first. |
 | `tools/check_clipboard.ps1` | The same from outside, through the real window: a portable copy in a temporary folder with `/clearafter:5`; exclusion formats, wipe after the time, a later copy by another program left alone, wipe on exit, `/clearafter` not saved. Run it in an interactive session (Windows PowerShell, `-STA`). |
 | `tools/audit_sources.py` | Copyright and licence header (GPL-2.0-only, SPDX) in every source file, comments in English, line endings, the version written only in `src/version.h`, every interface text in the three languages. |
@@ -124,11 +132,16 @@ Hasta la versión 2.1 se llamaba Wyrmhold.
   (Win+V) y de la nube, y **se borra a los 2 minutos** (de 10 s a 10 min en la ventana, o nunca) o apenas se cierra
   el programa — solo si el portapapeles sigue teniendo exactamente lo que puso Forja, así que lo que hayas copiado
   después no se toca. Ver [Portapapeles](#portapapeles).
-- **Actualizaciones que se instalan solas:** Ayuda → Buscar actualizaciones, y una vez por día por su cuenta (se
-  puede apagar). Una sola pregunta — Actualizar ahora, Ver novedades o Más tarde — y después se descarga el
-  instalador, se verifica contra el `SHA256SUMS.txt` de la versión publicada (si no coincide se borra y nunca se
-  ejecuta), se instala en silencio con las mismas opciones y Forja vuelve a abrirse. Una copia portable solo
-  ofrece abrir la página de descarga. Ver [Actualizaciones](#actualizaciones).
+- **Actualizaciones que se instalan solas:** Ayuda → Buscar actualizaciones, y una vez por día por su cuenta si
+  decís que sí la primera vez que abrís Forja (se puede apagar). Una sola pregunta — Actualizar ahora, Ver
+  novedades o Más tarde — y después se descarga el instalador solo si la versión publicada lleva la firma del autor,
+  se verifica contra su `SHA256SUMS.txt` (si no coincide se borra y nunca se ejecuta), se instala en silencio con
+  las mismas opciones y Forja vuelve a abrirse. Una copia portable solo ofrece abrir la página de descarga. Ver
+  [Actualizaciones](#actualizaciones).
+- **Accesible:** el Narrador y los otros lectores de pantalla nombran cada control, con el estado de los
+  interruptores, las fichas y los modos, el valor del deslizador, las contraseñas de la lista y los menús, y leen
+  la línea de estado cuando cambia. Nítido en cualquier pantalla: si la ventana pasa a una pantalla con otra
+  escala, se vuelve a dibujar a esa escala.
 - Inglés, japonés y español; tema claro, oscuro o como Windows y doce colores, que también pintan el ícono.
 - **Instalador** en los tres idiomas, por usuario y sin permisos de administrador, con un desinstalador limpio.
   O portable: un único `forja.exe` estático con un `forja.ini` vacío al lado.
@@ -152,8 +165,13 @@ Hasta la versión 2.1 se llamaba Wyrmhold.
 ### Actualizaciones
 
 - **Ayuda → Buscar actualizaciones…** le pregunta a `api.github.com` por la última versión publicada; **Ayuda →
-  Buscar actualizaciones todos los días** (encendido de fábrica, `CheckUpdates=1|0` en `forja.ini`) lo hace
-  solo, como mucho una vez por día. Solo se pide la versión: no se envía nada sobre vos ni tus contraseñas.
+  Buscar actualizaciones todos los días** (`CheckUpdates=1|0` en `forja.ini`) lo hace solo, como mucho una vez por
+  día. Solo se pide la versión: no se envía nada sobre vos ni tus contraseñas.
+- La primera vez que abrís Forja (sin `CheckUpdates` en `forja.ini`, también si venís de la 3.0 o anterior) te
+  pregunta una sola vez si querés que busque todos los días, antes de consultarle nada a GitHub. La respuesta se
+  guarda; si cerrás la pregunta sin contestar no se guarda nada, esa vez no se busca y se vuelve a preguntar en el
+  próximo arranque. Si lo abre el instalador después de una actualización, la búsqueda diaria sigue encendida,
+  sin preguntar.
 - Si la versión publicada es más nueva, una sola pregunta: **Actualizar ahora**, **Ver novedades** (abre la página
   de la versión) o **Más tarde**.
 - **Actualizar ahora** comprueba primero que el `SHA256SUMS.txt` de la versión publicada lleve la firma del autor
@@ -201,7 +219,8 @@ Forja はスペイン語で「鍛冶場」。金床の上で槌を打って金�
 - **一様:** 乱数は `BCryptGenRandom`。規則に反するパスワードは修正せず引き直すため、有効なパスワードはすべて同じ確率です。
   表示されるエントロピーはすべての規則を含めた正確な値です。
 - 1 つまたは全部をコピー、またはテキストファイルに保存。コピーはクリップボード履歴(Win+V)とクラウドに残らず、**2 分後**(ウィンドウでは 10 秒〜10 分、またはオフ)またはプログラム終了時に消去されます。消去するのはクリップボードの中身が Forja の入れたものとまったく同じ場合だけなので、後からコピーしたものには手を触れません。設定は `forja.ini` の `ClearClipboard=1|0` と `ClearSeconds=120`(5〜3600)、そのセッションだけなら `/clearafter:90`、`/clearafter:5m`、`/clearafter:off`(保存されません)。
-- **自動でインストールされる更新:** 「ヘルプ」→「更新の確認」、および 1 日 1 回の自動確認(オフにできます)。「今すぐ更新」「更新内容を見る」「後で」の質問が 1 回だけ表示され、その後はセットアップのダウンロード、リリースの `SHA256SUMS.txt` との照合(一致しないファイルは削除され、実行されません)、同じ設定での自動インストール、Forja の再起動まで自動で行われます。ポータブル版はダウンロードページを開くことだけを提案します。
+- **自動でインストールされる更新:** 「ヘルプ」→「更新の確認」、および 1 日 1 回の自動確認(初回起動時に一度だけ確認するかどうかを尋ねます。後からオフにもできます)。「今すぐ更新」「更新内容を見る」「後で」の質問が 1 回だけ表示され、その後はリリースに作者の署名(`release.sig`)がある場合に限りセットアップのダウンロード、リリースの `SHA256SUMS.txt` との照合(一致しないファイルは削除され、実行されません)、同じ設定での自動インストール、Forja の再起動まで自動で行われます。ポータブル版はダウンロードページを開くことだけを提案します。
+- **アクセシビリティ:** ナレーターなどのスクリーンリーダーが、すべてのコントロールの名前、スイッチ・チップ・モードの状態、スライダーの値、一覧のパスワード、メニューを読み上げ、状態表示の変化も読み上げます。表示倍率の異なる画面にウィンドウを移すと、その倍率で描き直されるため、どの画面でもくっきり表示されます。
 - 英語・日本語・スペイン語。ライト・ダーク・Windows に合わせるテーマと 12 色(アイコンの色も変わります)。
 - 3 か国語の**セットアップ**(ユーザー単位、管理者権限不要、きれいに削除できるアンインストーラー)。またはポータブル:
   静的リンクの `forja.exe` と空の `forja.ini`。

@@ -62,12 +62,19 @@ enum {
 	S_UPD_UPTODATE, S_UPD_AVAILABLE, S_UPD_PORTABLE, S_UPD_ERROR, S_UPD_ASK_HEAD, S_UPD_ASK,
 	S_UPD_NOW, S_UPD_NOTES, S_UPD_LATER, S_UPD_CHECKING, S_UPD_DOWNLOADING, S_UPD_NOHASH, S_UPD_BADHASH, S_UPD_BADSIG,
 	S_UPD_FAILED, S_UPD_UPDATED, S_UPD_NET, S_UPD_BADREPLY,
+	S_FIRST_UPD_HEAD, S_FIRST_UPD_BODY, S_FIRST_UPD_YES, S_FIRST_UPD_NO,
+	S_ACC_LIST, S_ACC_FEWER, S_ACC_MORE,
 	S_HELP_TITLE, S_HELP_BODY, S_BTN_OK,
 	S_ABOUT_TITLE, S_ABOUT_NAME, S_ABOUT_MEANING, S_ABOUT_VERSION, S_ABOUT_BODY, S_ABOUT_AUTHOR, S_ABOUT_CREDITS, S_ABOUT_LICENSE,
 	S_COUNT
 };
 
-static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
+/* The table itself is compiled once, in forja.c (which defines UI_STRINGS_TABLE); every other
+ * module sees only its declaration. */
+#ifndef UI_STRINGS_TABLE
+extern const wchar_t* const STR[LANG_COUNT][S_COUNT];
+#else
+const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 
 /* ------------------------------------------------------------------ English */
 {
@@ -279,6 +286,15 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_UPD_UPDATED]    = L"Forja was updated to %ls.",
 	[S_UPD_NET]        = L"The connection to GitHub failed (error %lu).",
 	[S_UPD_BADREPLY]   = L"GitHub's answer could not be read.",
+	[S_FIRST_UPD_HEAD] = L"Check for new versions automatically?",
+	[S_FIRST_UPD_BODY] = L"Forja can ask GitHub once a day whether there is a newer version, and offer it when there is. "
+	                     L"Only the latest version is asked for: nothing about your passwords or your settings is sent. "
+	                     L"You can change this at any time in Help → Check for updates daily.",
+	[S_FIRST_UPD_YES]  = L"Check daily",
+	[S_FIRST_UPD_NO]   = L"Don't check",
+	[S_ACC_LIST]       = L"Passwords",
+	[S_ACC_FEWER]      = L"One fewer",
+	[S_ACC_MORE]       = L"One more",
 	[S_HELP_TITLE]     = L"Forja \x2014 Help",
 	[S_HELP_BODY]      =
 		L"# What it does\n"
@@ -567,6 +583,15 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_UPD_UPDATED]    = L"Forja を %ls に更新しました。",
 	[S_UPD_NET]        = L"GitHub に接続できませんでした (エラー %lu)。",
 	[S_UPD_BADREPLY]   = L"GitHub からの応答を読み取れませんでした。",
+	[S_FIRST_UPD_HEAD] = L"新しいバージョンを自動で確認しますか？",
+	[S_FIRST_UPD_BODY] = L"Forja は 1 日に 1 回、新しいバージョンがあるかを GitHub に問い合わせ、あればお知らせします。"
+	                     L"問い合わせるのは最新のバージョンだけで、パスワードや設定は一切送信されません。"
+	                     L"この設定は［ヘルプ］→［毎日自動で更新を確認］でいつでも変更できます。",
+	[S_FIRST_UPD_YES]  = L"毎日確認する",
+	[S_FIRST_UPD_NO]   = L"確認しない",
+	[S_ACC_LIST]       = L"パスワード",
+	[S_ACC_FEWER]      = L"1 つ減らす",
+	[S_ACC_MORE]       = L"1 つ増やす",
 	[S_HELP_TITLE]     = L"Forja \x2014 ヘルプ",
 	[S_HELP_BODY]      =
 		L"# できること\n"
@@ -852,6 +877,15 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_UPD_UPDATED]    = L"Forja se actualizó a la %ls.",
 	[S_UPD_NET]        = L"Falló la conexión con GitHub (error %lu).",
 	[S_UPD_BADREPLY]   = L"No se pudo leer la respuesta de GitHub.",
+	[S_FIRST_UPD_HEAD] = L"¿Buscar versiones nuevas automáticamente?",
+	[S_FIRST_UPD_BODY] = L"Forja puede preguntarle a GitHub una vez por día si hay una versión más nueva y ofrecértela cuando la haya. "
+	                     L"Solo se pregunta cuál es la última versión: no se envía nada de tus contraseñas ni de tu configuración. "
+	                     L"Lo podés cambiar cuando quieras en Ayuda → Buscar actualizaciones todos los días.",
+	[S_FIRST_UPD_YES]  = L"Buscar todos los días",
+	[S_FIRST_UPD_NO]   = L"No buscar",
+	[S_ACC_LIST]       = L"Contraseñas",
+	[S_ACC_FEWER]      = L"Una menos",
+	[S_ACC_MORE]       = L"Una más",
 	[S_HELP_TITLE]     = L"Forja \x2014 Ayuda",
 	[S_HELP_BODY]      =
 		L"# Qué hace\n"
@@ -931,5 +965,6 @@ static const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"Se ofrece sin garantía. \x00A9 2026 Gabriel Castiglia.",
 },
 };
+#endif /* UI_STRINGS_TABLE */
 
 #endif

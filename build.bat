@@ -27,8 +27,10 @@ if errorlevel 1 goto :failed
 
 echo [2/2] program
 gcc -B build\nodefman\ -O2 -Wall -Wextra -mwindows -static -DUNICODE -D_UNICODE -Isrc ^
-    -o build\forja.exe src\forja.c src\pwgen.c src\update.c build\app.res ^
-    -lcomctl32 -lcomdlg32 -lgdi32 -luxtheme -ldwmapi -lbcrypt -lshell32 -lgdiplus -lwinhttp -ladvapi32 -lm
+    -o build\forja.exe src\forja.c src\settings.c src\theme.c src\draw.c src\controls.c src\layout.c ^
+    src\dialogs.c src\clipboard.c src\filesave.c src\updui.c src\cli.c src\selftest.c ^
+    src\access.c src\pwgen.c src\update.c build\app.res ^
+    -lcomctl32 -lcomdlg32 -lgdi32 -luxtheme -ldwmapi -lbcrypt -lshell32 -lgdiplus -lwinhttp -ladvapi32 -loleacc -lole32 -loleaut32 -luuid -lm
 if errorlevel 1 goto :failed
 
 echo.

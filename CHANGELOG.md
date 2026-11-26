@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.1.0 — 2026-11-26
+
+- **The first start asks before checking for updates**: with no `CheckUpdates` in `forja.ini` (a new install, or
+  settings from 3.0 and older) Forja asks once whether it may ask GitHub for a new version every day, before it
+  asks anything. The answer is saved and can be changed in the Help menu; closing the question saves nothing and
+  checks nothing that time. A start by the setup after an update keeps the daily check on, without asking.
+- **Screen readers**: Narrator and other readers now name every control Forja draws itself and say what it is and
+  how it is: modes and colours as options, chips and switches as check boxes that are on or off, the slider with
+  its value, the drop-downs with what they hold, the number and text fields with their labels, the − and + of the
+  count, the icon buttons. Each row of the list is read as its password (the list asks for it when a reader
+  does; it still keeps no copy), the menus are read, and the status line is read out as it changes, without
+  moving the focus.
+- **Per-monitor scaling** (PerMonitorV2): moved to a screen with another scale, the window is drawn again at that
+  scale — fonts, icons, rows and layout — instead of being stretched as a picture, blurry; Help, About and Theme
+  open again at it. A window that opens on such a screen takes its scale before it is shown.
+- Internal: the window's source, a single forja.c of about 5200 lines, is split into modules without any change of
+  behaviour: forja.c (state, window procedure, entry), settings.c, theme.c, draw.c, controls.c, layout.c,
+  dialogs.c, clipboard.c, filesave.c, updui.c, cli.c and selftest.c, sharing forja.h, plus access.c for screen
+  readers. The string table of ui_strings.h is compiled once (in forja.c) instead of in every file that includes it.
+- The source audit (`tools/audit_sources.py`) is clean again: a comment of 3.0.2 had an accented letter.
+
 ## 3.0.2 — 2026-11-25
 
 - **Updates signed by the author**: the `SHA256SUMS.txt` of a release must now carry the author's signature

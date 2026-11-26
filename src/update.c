@@ -486,7 +486,7 @@ int upd_selftest(FILE* log)
 	expect(log, upd_sha256("abc", 3, d) && !memcmp(d, abc, 32), "SHA-256 of \"abc\" (FIPS 180-2 example)");
 
 	/* release.sig: real signatures by the author's two keys (the PC's, the Mac's) of the same bytes, as in
-	 * the self-tests of Vigía, Muelle and Haul; any change is refused */
+	 * the self-tests of Vigia, Muelle and Haul; any change is refused */
 	{
 		static const char signedSums[] =
 			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789ABCDEF  Vigia-Setup-9.9.9.exe\n"

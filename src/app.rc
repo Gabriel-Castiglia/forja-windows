@@ -5,7 +5,7 @@
   SPDX-License-Identifier: GPL-2.0-only
 
   The icon (drawn by tools/make_icon.py), the keyboard accelerators, the version block,
-  and the manifest (themed common controls, DPI aware).
+  and the manifest (themed common controls, per-monitor DPI aware).
 **/
 
 #include <windows.h>
