@@ -152,6 +152,7 @@ static int lettersRequired(const PwOptions* o, const Classes* c)
 	return o->startLetter && (c->n[C_LOWER] + c->n[C_UPPER]) > 0;
 }
 
+/* The digits a PIN may use: 0 to 9 without the excluded ones. */
 static void pinDigits(const PwOptions* o, char* out)
 {
 	filterInto("0123456789", o, 0, out);
@@ -255,6 +256,8 @@ static double pinEntropy(const PwOptions* o)
 	return total > 0 ? acc + log2(total) : 0;
 }
 
+/* Passphrase: every word, every random-digit separator and the added digit (its value and
+ * the word it follows) are independent, so their bits simply add up. */
 static double wordsEntropy(const PwOptions* o)
 {
 	int n = clampInt(o->words, PW_MIN_WORDS, PW_MAX_WORDS);
@@ -363,17 +366,6 @@ int pw_pool(const PwOptions* o)
 	{ Classes c; buildClasses(o, &c); return c.nPool; }
 }
 
-void pw_symbols_in_use(const PwOptions* o, char* out)
-{
-	Classes c;
-
-	buildClasses(o, &c);
-	memcpy(out, c.set[C_SYMBOL], (size_t)c.n[C_SYMBOL] + 1);
-}
-
-int pw_word_count(void) { return WORD_COUNT; }
-const char* pw_word(int i) { return (i >= 0 && i < WORD_COUNT) ? WORDS[i] : ""; }
-
 /* ------------------------------------------------------------------ drawing passwords */
 
 /* makeChars and makePin return the length, 0 when MAX_TRIES ran out, -1 when the random
@@ -446,6 +438,8 @@ static int makePin(const PwOptions* o, char* out)
 	return 0;
 }
 
+/* A passphrase never breaks a rule, so it is drawn once. Returns its length, 0 when the
+ * random number generator failed. */
 static int makeWords(const PwOptions* o, char* out)
 {
 	static const char SEP[PW_SEP_COUNT] = { '-', ' ', '.', '_', 0, 0 };
@@ -495,19 +489,4 @@ int pw_make_ex(const PwOptions* o, char* out, int* why)
 	if (n <= 0) { SecureZeroMemory(out, PW_OUT_MAX); n = 0; }
 	if (why) *why = n ? PW_FAIL_NONE : fail;
 	return n;
-}
-
-int pw_make(const PwOptions* o, char* out)
-{
-	return pw_make_ex(o, out, NULL);
-}
-
-int pw_generate(int length, int avoidAmbiguous, char* out)
-{
-	PwOptions o;
-
-	pw_defaults(&o);
-	o.length = length;
-	o.avoidAmbiguous = avoidAmbiguous;
-	return pw_make(&o, out);
 }

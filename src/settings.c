@@ -22,10 +22,8 @@
 void iniPath(void)
 {
 	wchar_t* slash;
-	wchar_t dir[MAX_PATH];
+	wchar_t dir[MAX_PATH], old[MAX_PATH];
 	DWORD n;
-
-	wchar_t old[MAX_PATH];
 
 	GetModuleFileNameW(NULL, gIni, MAX_PATH);
 	slash = wcsrchr(gIni, L'\\');
@@ -53,6 +51,7 @@ void iniPath(void)
 		CopyFileW(old, gIni, TRUE);
 }
 
+/* A number from the .ini, or def when the key is missing. */
 int iniInt(const wchar_t* key, int def)
 {
 	wchar_t buf[32];
@@ -77,7 +76,7 @@ void iniStr(const wchar_t* key, wchar_t* out, int cap)
 }
 
 /* Character sets are stored between quotes: the .ini reader trims spaces and strips one
- * pair of outer quotes, so the set comes back exactly, spaces and quotes included. */
+ * pair of outer quotes, so a set that starts or ends with a quote comes back exactly. */
 static void iniSetChars(const wchar_t* key, const char* v)
 {
 	wchar_t w[PW_SET_MAX + 4];
@@ -88,6 +87,7 @@ static void iniSetChars(const wchar_t* key, const char* v)
 	WritePrivateProfileStringW(INI_SECTION, key, w, gIni);
 }
 
+/* A character set from the .ini: printable ASCII only (no spaces), at most PW_SET_MAX - 1. */
 static void iniChars(const wchar_t* key, char* out)
 {
 	wchar_t w[PW_SET_MAX + 4];
@@ -104,7 +104,8 @@ void iniSetStr(const wchar_t* key, const wchar_t* v)
 	if (!gNoSave) WritePrivateProfileStringW(INI_SECTION, key, v, gIni);
 }
 
-
+/* Everything the window remembers, written on exit. The theme, the colour, the language,
+ * the update check and the last folder are written as soon as they change. */
 void saveSettings(void)
 {
 	WINDOWPLACEMENT wp;
@@ -148,6 +149,7 @@ void saveSettings(void)
 	iniSetInt(L"WndMax", wp.showCmd == SW_SHOWMAXIMIZED);
 }
 
+/* Every setting, each one clamped to what the program accepts. */
 void loadSettings(void)
 {
 	pw_defaults(&gOpt);

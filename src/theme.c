@@ -29,6 +29,7 @@ const Accent ACCENTS[ACCENT_COUNT] = {
 	{ S_ACCENT_WHITE,  RGB(0x47,0x55,0x69), RGB(0xF1,0xF5,0xF9), RGB(0xF1,0xF5,0xF9) },
 };
 
+/* The colour t of the way from a to b (0 = a, 1 = b). */
 COLORREF mix(COLORREF a, COLORREF b, double t)
 {
 	return RGB((int)(GetRValue(a) + (GetRValue(b) - GetRValue(a)) * t + 0.5),
@@ -36,11 +37,14 @@ COLORREF mix(COLORREF a, COLORREF b, double t)
 	           (int)(GetBValue(a) + (GetBValue(b) - GetBValue(a)) * t + 0.5));
 }
 
-double luminance(COLORREF c)
+/* Relative luminance, 0 (black) to 1 (white): how light a colour looks to the eye. */
+static double luminance(COLORREF c)
 {
 	return (0.2126 * GetRValue(c) + 0.7152 * GetGValue(c) + 0.0722 * GetBValue(c)) / 255.0;
 }
 
+/* The colours of the light or dark theme, with the accent chosen. The light theme with the
+ * black accent is the default look (tools/make_guide.py takes the guides' colours from here). */
 void makePalette(void)
 {
 	COLORREF a = gDark ? ACCENTS[gAccent].dark : ACCENTS[gAccent].light;
@@ -261,6 +265,16 @@ HICON tintedIconFor(int accent, int size)
 	return out;
 }
 
+/* The title bar and taskbar icons of a window: the current ones, tinted in the accent. */
+void setWindowIcons(HWND h)
+{
+	if (!h) return;
+	SendMessageW(h, WM_SETICON, ICON_BIG, (LPARAM)icBig);
+	SendMessageW(h, WM_SETICON, ICON_SMALL, (LPARAM)icSmall);
+}
+
+/* Makes every icon again in the current accent and scale. The old ones are destroyed only
+ * after every window has been given the new ones. */
 void makeIcons(void)
 {
 	HICON ob = icBand, oa = icAbout, og = icBig, os = icSmall;
@@ -269,14 +283,10 @@ void makeIcons(void)
 	icAbout = tintedIconFor(gAccent, SC(72));
 	icBig   = tintedIconFor(gAccent, GetSystemMetrics(SM_CXICON));
 	icSmall = tintedIconFor(gAccent, GetSystemMetrics(SM_CXSMICON));
-	if (hMain)
-	{
-		SendMessageW(hMain, WM_SETICON, ICON_BIG, (LPARAM)icBig);
-		SendMessageW(hMain, WM_SETICON, ICON_SMALL, (LPARAM)icSmall);
-	}
-	if (hHelpWnd)  { SendMessageW(hHelpWnd, WM_SETICON, ICON_BIG, (LPARAM)icBig);  SendMessageW(hHelpWnd, WM_SETICON, ICON_SMALL, (LPARAM)icSmall); }
-	if (hAboutWnd) { SendMessageW(hAboutWnd, WM_SETICON, ICON_BIG, (LPARAM)icBig); SendMessageW(hAboutWnd, WM_SETICON, ICON_SMALL, (LPARAM)icSmall); }
-	if (hThemeWnd) { SendMessageW(hThemeWnd, WM_SETICON, ICON_BIG, (LPARAM)icBig); SendMessageW(hThemeWnd, WM_SETICON, ICON_SMALL, (LPARAM)icSmall); }
+	setWindowIcons(hMain);
+	setWindowIcons(hHelpWnd);
+	setWindowIcons(hAboutWnd);
+	setWindowIcons(hThemeWnd);
 	if (ob) DestroyIcon(ob);
 	if (oa) DestroyIcon(oa);
 	if (og) DestroyIcon(og);
@@ -355,6 +365,15 @@ static BOOL CALLBACK setFontChild(HWND h, LPARAM lp)
 	return TRUE;
 }
 
+/* Help, About and Theme, when open, are closed and opened again: their text and sizes are
+ * measured when they are made. */
+static void reopenDialogs(void)
+{
+	if (hHelpWnd)  { DestroyWindow(hHelpWnd); showHelp(hMain); }
+	if (hAboutWnd) { DestroyWindow(hAboutWnd); showAbout(hMain); }
+	if (hThemeWnd) { DestroyWindow(hThemeWnd); showTheme(hMain); }
+}
+
 static void applyLanguage(void)
 {
 	makeFonts();
@@ -371,10 +390,7 @@ static void applyLanguage(void)
 	if (gPwN > 0) sayGenerated();
 	else          setStatus(ST_PLAIN, T(S_ST_READY));
 
-	if (hHelpWnd)  { DestroyWindow(hHelpWnd); showHelp(hMain); }
-	if (hAboutWnd) { DestroyWindow(hAboutWnd); showAbout(hMain); }
-	if (hThemeWnd) { DestroyWindow(hThemeWnd); showTheme(hMain); }
-
+	reopenDialogs();
 	dropOldFonts();
 	RedrawWindow(hMain, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
@@ -388,7 +404,7 @@ void applyDpi(int dpi, const RECT* rect)
 {
 	HFONT oldPw = fPw, oldPwSmall = fPwSmall;
 
-	if (dpi < 96 || dpi > 960) return;
+	if (dpi < 96 || dpi > 960) return;      /* an answer that cannot be right */
 	if (dpi != gDpi)
 	{
 		gDpi = dpi;
@@ -406,9 +422,7 @@ void applyDpi(int dpi, const RECT* rect)
 	if (oldPw == fPw) return;   /* the same scale: only moved */
 
 	layout();
-	if (hHelpWnd)  { DestroyWindow(hHelpWnd); showHelp(hMain); }
-	if (hAboutWnd) { DestroyWindow(hAboutWnd); showAbout(hMain); }
-	if (hThemeWnd) { DestroyWindow(hThemeWnd); showTheme(hMain); }
+	reopenDialogs();
 	dropOldFonts();
 	if (oldPw) DeleteObject(oldPw);
 	if (oldPwSmall) DeleteObject(oldPwSmall);

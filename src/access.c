@@ -32,6 +32,7 @@ DEFINE_GUID(FORJA_LiveSetting, 0xc12bcd8e, 0x2a8e, 0x4950, 0x8a, 0xe7, 0x36, 0x2
 static IAccPropServices* gAps = NULL;
 static int gApsTried = 0;
 
+/* The Dynamic Annotation service, created on first use; NULL when it is not available. */
 static IAccPropServices* aps(void)
 {
 	if (!gApsTried)
@@ -45,6 +46,7 @@ static IAccPropServices* aps(void)
 	return gAps;
 }
 
+/* A numeric property (role, state, live setting) of a window. */
 static void setInt(HWND h, const MSAAPROPID* prop, LONG value)
 {
 	VARIANT v;
@@ -59,11 +61,6 @@ static void setInt(HWND h, const MSAAPROPID* prop, LONG value)
 void accSetName(HWND h, const wchar_t* name)
 {
 	if (h && aps()) IAccPropServices_SetHwndPropStr(gAps, h, OBJID_CLIENT, CHILDID_SELF, PROPID_ACC_NAME, name);
-}
-
-void accSetDescription(HWND h, const wchar_t* text)
-{
-	if (h && aps()) IAccPropServices_SetHwndPropStr(gAps, h, OBJID_CLIENT, CHILDID_SELF, PROPID_ACC_DESCRIPTION, text);
 }
 
 void accSetValue(HWND h, const wchar_t* value)
@@ -128,8 +125,7 @@ void accNameMenu(HMENU m)
 		if ((mi.fType & MFT_SEPARATOR) || mi.dwItemData == MENU_SEP) continue;
 		id = MENU_ID(mi.dwItemData);
 		if (id < 0 || id >= S_COUNT) continue;
-		_snwprintf(name, 160, L"%.*ls", headLen(T(id)), T(id));
-		name[159] = 0;
+		headCopy(name, 160, T(id));
 		ZeroMemory(&mi, sizeof(mi));
 		mi.cbSize = sizeof(mi);
 		mi.fMask = MIIM_STRING;

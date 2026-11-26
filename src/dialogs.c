@@ -11,6 +11,35 @@
 
 #include "forja.h"
 
+/* The light strip at the foot of the Help and Theme windows, where the OK button sits. */
+static void paintFooter(HDC dc, const RECT* rc)
+{
+	RECT bar;
+
+	SetRect(&bar, 0, rc->bottom - SC(64), rc->right, rc->bottom);
+	fillSolid(dc, &bar, PAL.page);
+	bar.bottom = bar.top + 1;
+	fillSolid(dc, &bar, PAL.border);
+}
+
+/* A modal window of the given client size, centred across its owner and a third of the way
+ * down, with the icons of the main window. NULL if it could not be made. */
+static HWND createModal(HWND owner, const wchar_t* cls, const wchar_t* title, int cw, int ch)
+{
+	RECT r, want;
+	HWND w;
+
+	SetRect(&want, 0, 0, cw, ch);
+	AdjustWindowRectEx(&want, WS_POPUPWINDOW | WS_CAPTION, FALSE, WS_EX_DLGMODALFRAME);
+	GetWindowRect(owner, &r);
+	w = CreateWindowExW(WS_EX_DLGMODALFRAME, cls, title, WS_POPUPWINDOW | WS_CAPTION,
+	                    r.left + ((r.right - r.left) - (want.right - want.left)) / 2,
+	                    r.top + ((r.bottom - r.top) - (want.bottom - want.top)) / 3,
+	                    want.right - want.left, want.bottom - want.top, owner, NULL, gInst, NULL);
+	setWindowIcons(w);
+	return w;
+}
+
 /* ------------------------------------------------------------------ help window */
 
 /* The help text is one string per language: "# " starts a heading, "\x2022 " a bullet,
@@ -18,6 +47,8 @@
 
 static int gHelpScroll = 0, gHelpHeight = 0;
 
+/* Lays the help text out from `top`, scrolled by `scroll`, and paints it when `paint` is set.
+ * Returns the height of the whole text. */
 static int helpLayout(HDC dc, int width, int top, int scroll, int paint)
 {
 	const wchar_t* s = T(S_HELP_BODY);
@@ -57,6 +88,7 @@ static int helpLayout(HDC dc, int width, int top, int scroll, int paint)
 	return y + scroll - top + SC(20);
 }
 
+/* Scrolls the help text to pos (clamped), and updates the scroll bar. */
 static void helpScrollTo(HWND hwnd, int pos)
 {
 	RECT rc;
@@ -95,24 +127,16 @@ static LRESULT CALLBACK helpProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		HDC dc = BeginPaint(hwnd, &ps), mem = CreateCompatibleDC(dc);
-		RECT rc, bar;
-		HBITMAP bmp;
-		HGDIOBJ ob;
+		BackBuf bb;
+		HDC dc = BeginPaint(hwnd, &ps), mem;
+		RECT rc;
 
 		GetClientRect(hwnd, &rc);
-		bmp = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
-		ob = SelectObject(mem, bmp);
+		mem = bufBegin(&bb, dc, 0, 0, rc.right, rc.bottom);
 		fillSolid(mem, &rc, PAL.card);
 		helpLayout(mem, rc.right, SC(16), gHelpScroll, 1);
-		SetRect(&bar, 0, rc.bottom - SC(64), rc.right, rc.bottom);
-		fillSolid(mem, &bar, PAL.page);
-		bar.bottom = bar.top + 1;
-		fillSolid(mem, &bar, PAL.border);
-		BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
-		SelectObject(mem, ob);
-		DeleteObject(bmp);
-		DeleteDC(mem);
+		paintFooter(mem, &rc);
+		bufEnd(&bb);
 		EndPaint(hwnd, &ps);
 		return 0;
 	}
@@ -171,36 +195,22 @@ static LRESULT CALLBACK helpProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+/* The Help window: not modal, so it can stay open beside the main window. */
 void showHelp(HWND owner)
 {
-	static int registered = 0;
 	HWND ok;
 	RECT r;
 
 	if (hHelpWnd) { SetForegroundWindow(hHelpWnd); return; }
 
-	if (!registered)
-	{
-		WNDCLASSW wc;
-		ZeroMemory(&wc, sizeof(wc));
-		wc.style = CS_HREDRAW | CS_VREDRAW;
-		wc.lpfnWndProc = helpProc;
-		wc.hInstance = gInst;
-		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wc.lpszClassName = L"ForjaHelp";
-		RegisterClassW(&wc);
-		registered = 1;
-	}
-
+	registerClass(L"ForjaHelp", helpProc, CS_HREDRAW | CS_VREDRAW);
 	gHelpScroll = 0;
 	GetWindowRect(owner, &r);
 	hHelpWnd = CreateWindowExW(0, L"ForjaHelp", T(S_HELP_TITLE), WS_OVERLAPPEDWINDOW | WS_VSCROLL,
 	                           r.left + SC(40), r.top + SC(30), SC(700), SC(660), owner, NULL, gInst, NULL);
-	SendMessageW(hHelpWnd, WM_SETICON, ICON_BIG, (LPARAM)icBig);
-	SendMessageW(hHelpWnd, WM_SETICON, ICON_SMALL, (LPARAM)icSmall);
-	ok = mkButton(hHelpWnd, IDOK, K_PRIMARY, S_BTN_OK, NULL, 0, G_NONE);
-	SetWindowLongPtrW(ok, GWL_STYLE, GetWindowLongPtrW(ok, GWL_STYLE) | BS_DEFPUSHBUTTON);
-	SendMessageW(ok, WM_SETFONT, (WPARAM)fBold, FALSE);
+	if (!hHelpWnd) return;
+	setWindowIcons(hHelpWnd);
+	ok = mkDefaultButton(hHelpWnd, IDOK, S_BTN_OK);
 	applyTheme(hHelpWnd);
 	ShowWindow(hHelpWnd, SW_SHOW);
 	SendMessageW(hHelpWnd, WM_SIZE, 0, 0);
@@ -219,6 +229,7 @@ void showHelp(HWND owner)
 #define AB_TEXT  146
 #define AB_GAP   12
 
+/* The height of s wrapped to `width` in the font selected into dc. */
 static int textHeight(HDC dc, const wchar_t* s, int width)
 {
 	RECT r = { 0, 0, width, 0 };
@@ -247,16 +258,14 @@ static LRESULT CALLBACK aboutProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		HDC dc = BeginPaint(hwnd, &ps), mem = CreateCompatibleDC(dc);
+		BackBuf bb;
+		HDC dc = BeginPaint(hwnd, &ps), mem;
 		RECT rc, t;
-		HBITMAP bmp;
-		HGDIOBJ ob;
 		wchar_t line[128];
 		int tx = SC(AB_M + AB_ICON + 20), wdt;
 
 		GetClientRect(hwnd, &rc);
-		bmp = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
-		ob = SelectObject(mem, bmp);
+		mem = bufBegin(&bb, dc, 0, 0, rc.right, rc.bottom);
 		fillSolid(mem, &rc, PAL.card);
 		t = rc;
 		t.bottom = SC(4);
@@ -290,10 +299,7 @@ static LRESULT CALLBACK aboutProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			SelectObject(mem, of);
 		}
 
-		BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
-		SelectObject(mem, ob);
-		DeleteObject(bmp);
-		DeleteDC(mem);
+		bufEnd(&bb);
 		EndPaint(hwnd, &ps);
 		return 0;
 	}
@@ -317,42 +323,21 @@ static LRESULT CALLBACK aboutProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+/* The About window: modal, it disables the main window while it is up. */
 void showAbout(HWND owner)
 {
-	static int registered = 0;
 	HWND ok;
-	RECT r, want, c;
-	int ch;
+	RECT c;
 
 	if (hAboutWnd) { SetForegroundWindow(hAboutWnd); return; }
 
-	if (!registered)
-	{
-		WNDCLASSW wc;
-		ZeroMemory(&wc, sizeof(wc));
-		wc.lpfnWndProc = aboutProc;
-		wc.hInstance = gInst;
-		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wc.lpszClassName = L"ForjaAbout";
-		RegisterClassW(&wc);
-		registered = 1;
-	}
-
-	ch = SC(AB_TEXT) + aboutBodyHeight(SC(AB_W - 2 * AB_M)) + SC(24) + SC(56);
-	SetRect(&want, 0, 0, SC(AB_W), ch);
-	AdjustWindowRectEx(&want, WS_POPUPWINDOW | WS_CAPTION, FALSE, WS_EX_DLGMODALFRAME);
-
-	GetWindowRect(owner, &r);
-	hAboutWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"ForjaAbout", T(S_ABOUT_TITLE),
-	                            WS_POPUPWINDOW | WS_CAPTION,
-	                            r.left + ((r.right - r.left) - (want.right - want.left)) / 2,
-	                            r.top + ((r.bottom - r.top) - (want.bottom - want.top)) / 3,
-	                            want.right - want.left, want.bottom - want.top, owner, NULL, gInst, NULL);
+	registerClass(L"ForjaAbout", aboutProc, 0);
+	hAboutWnd = createModal(owner, L"ForjaAbout", T(S_ABOUT_TITLE), SC(AB_W),
+	                        SC(AB_TEXT) + aboutBodyHeight(SC(AB_W - 2 * AB_M)) + SC(24) + SC(56));
+	if (!hAboutWnd) return;
 
 	GetClientRect(hAboutWnd, &c);
-	ok = mkButton(hAboutWnd, IDOK, K_PRIMARY, S_BTN_OK, NULL, 0, G_NONE);
-	SetWindowLongPtrW(ok, GWL_STYLE, GetWindowLongPtrW(ok, GWL_STYLE) | BS_DEFPUSHBUTTON);
-	SendMessageW(ok, WM_SETFONT, (WPARAM)fBold, FALSE);
+	ok = mkDefaultButton(hAboutWnd, IDOK, S_BTN_OK);
 	SetWindowPos(ok, NULL, c.right - SC(AB_M) - SC(110), c.bottom - SC(56), SC(110), SC(36), SWP_NOZORDER);
 
 	applyTheme(hAboutWnd);
@@ -373,6 +358,7 @@ void showAbout(HWND owner)
 #define TH_GAP   10
 #define TH_M     24
 
+/* Follow Windows (0), light (1) or dark (2): applied at once and remembered. */
 void setThemeChoice(int theme)
 {
 	gTheme = theme;
@@ -382,6 +368,7 @@ void setThemeChoice(int theme)
 	if (hThemeWnd) RedrawWindow(hThemeWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_FRAME);
 }
 
+/* One of the twelve colours: applied at once to every window and the icon, and remembered. */
 void setAccent(int accent)
 {
 	gAccent = clampInt(accent, 0, ACCENT_COUNT - 1);
@@ -409,14 +396,12 @@ static LRESULT CALLBACK themeProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		HDC dc = BeginPaint(hwnd, &ps), mem = CreateCompatibleDC(dc);
+		BackBuf bb;
+		HDC dc = BeginPaint(hwnd, &ps), mem;
 		RECT rc, t, track;
-		HBITMAP bmp;
-		HGDIOBJ ob;
 
 		GetClientRect(hwnd, &rc);
-		bmp = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
-		ob = SelectObject(mem, bmp);
+		mem = bufBegin(&bb, dc, 0, 0, rc.right, rc.bottom);
 		fillSolid(mem, &rc, PAL.card);
 		SetRect(&t, SC(TH_M), themeY(0), rc.right - SC(TH_M), themeY(0) + SC(24));
 		drawText(mem, T(S_THEME_APPEARANCE), -1, &t, fBold, PAL.text, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
@@ -424,14 +409,8 @@ static LRESULT CALLBACK themeProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		roundRect(mem, &track, SC(10), PAL.field, PAL.border, (float)SC(1));
 		SetRect(&t, SC(TH_M), themeY(2), rc.right - SC(TH_M), themeY(2) + SC(24));
 		drawText(mem, T(S_THEME_COLOUR), -1, &t, fBold, PAL.text, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-		SetRect(&t, 0, rc.bottom - SC(64), rc.right, rc.bottom);
-		fillSolid(mem, &t, PAL.page);
-		t.bottom = t.top + 1;
-		fillSolid(mem, &t, PAL.border);
-		BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
-		SelectObject(mem, ob);
-		DeleteObject(bmp);
-		DeleteDC(mem);
+		paintFooter(mem, &rc);
+		bufEnd(&bb);
 		EndPaint(hwnd, &ps);
 		return 0;
 	}
@@ -464,42 +443,22 @@ static LRESULT CALLBACK themeProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+/* The Theme window: modal like About. The swatch icons are made here and destroyed with it. */
 void showTheme(HWND owner)
 {
-	static int registered = 0;
 	static const int names[3] = { S_THEME_AUTO, S_THEME_LIGHT, S_THEME_DARK };
 	HWND ok;
-	RECT r, want, c;
+	RECT c;
 	int i, rows = (ACCENT_COUNT + TH_COLS - 1) / TH_COLS;
 	int cw = 2 * TH_M + TH_COLS * TH_TILE + (TH_COLS - 1) * TH_GAP;
-	int ch = 132 + rows * TH_TILEH + (rows - 1) * TH_GAP + 24 + 64;
+	int ch = 132 + rows * TH_TILEH + (rows - 1) * TH_GAP + 24 + 64;     /* 132: themeY(3), the tiles */
 
 	if (hThemeWnd) { SetForegroundWindow(hThemeWnd); return; }
 
-	if (!registered)
-	{
-		WNDCLASSW wc;
-		ZeroMemory(&wc, sizeof(wc));
-		wc.lpfnWndProc = themeProc;
-		wc.hInstance = gInst;
-		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wc.lpszClassName = L"ForjaTheme";
-		RegisterClassW(&wc);
-		registered = 1;
-	}
-
+	registerClass(L"ForjaTheme", themeProc, 0);
+	hThemeWnd = createModal(owner, L"ForjaTheme", T(S_THEME_TITLE), SC(cw), SC(ch));
+	if (!hThemeWnd) return;
 	for (i = 0; i < ACCENT_COUNT; i++) gSwatchIcon[i] = tintedIconFor(i, SC(44));
-
-	SetRect(&want, 0, 0, SC(cw), SC(ch));
-	AdjustWindowRectEx(&want, WS_POPUPWINDOW | WS_CAPTION, FALSE, WS_EX_DLGMODALFRAME);
-	GetWindowRect(owner, &r);
-	hThemeWnd = CreateWindowExW(WS_EX_DLGMODALFRAME, L"ForjaTheme", T(S_THEME_TITLE),
-	                            WS_POPUPWINDOW | WS_CAPTION,
-	                            r.left + ((r.right - r.left) - (want.right - want.left)) / 2,
-	                            r.top + ((r.bottom - r.top) - (want.bottom - want.top)) / 3,
-	                            want.right - want.left, want.bottom - want.top, owner, NULL, gInst, NULL);
-	SendMessageW(hThemeWnd, WM_SETICON, ICON_BIG, (LPARAM)icBig);
-	SendMessageW(hThemeWnd, WM_SETICON, ICON_SMALL, (LPARAM)icSmall);
 
 	for (i = 0; i < 3; i++)
 	{
@@ -514,9 +473,7 @@ void showTheme(HWND owner)
 	}
 
 	GetClientRect(hThemeWnd, &c);
-	ok = mkButton(hThemeWnd, IDOK, K_PRIMARY, S_BTN_OK, NULL, 0, G_NONE);
-	SetWindowLongPtrW(ok, GWL_STYLE, GetWindowLongPtrW(ok, GWL_STYLE) | BS_DEFPUSHBUTTON);
-	SendMessageW(ok, WM_SETFONT, (WPARAM)fBold, FALSE);
+	ok = mkDefaultButton(hThemeWnd, IDOK, S_BTN_OK);
 	SetWindowPos(ok, NULL, c.right - SC(TH_M) - SC(110), c.bottom - SC(50), SC(110), SC(36), SWP_NOZORDER);
 
 	applyTheme(hThemeWnd);

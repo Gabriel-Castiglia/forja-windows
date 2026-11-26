@@ -32,6 +32,8 @@ static int guessTimeString(double bits)
 	return S_TIME_FOREVER;
 }
 
+/* 0 very weak (below 36 bits), 1 weak (below 50), 2 fair (below 64), 3 strong (below 80),
+ * 4 very strong. */
 static int strengthLevel(double bits)
 {
 	return bits < 36 ? 0 : bits < 50 ? 1 : bits < 64 ? 2 : bits < 80 ? 3 : 4;
@@ -42,6 +44,8 @@ static COLORREF levelColour(int level)
 	return level <= 1 ? PAL.err : level == 2 ? PAL.warn : PAL.ok;
 }
 
+/* The strength line: five segments, the level and the bits, and below them the pool and the
+ * guessing time -- or, when the options cannot make a password, why not. */
 static void paintStrength(HDC dc)
 {
 	static const int words[5] = { S_STR_VWEAK, S_STR_WEAK, S_STR_FAIR, S_STR_STRONG, S_STR_VSTRONG };
@@ -100,6 +104,7 @@ static void paintStrength(HDC dc)
 
 /* ------------------------------------------------------------------ tooltips */
 
+/* Adds (TTM_ADDTOOLW) or updates (TTM_UPDATETIPTEXTW) the tooltip of a control. */
 static void setTip(HWND tool, int stringId, UINT msg)
 {
 	TOOLINFOW ti;
@@ -159,6 +164,8 @@ static void invalidateRow(int row)
 		InvalidateRect(hList, &r, FALSE);
 }
 
+/* The password row under a mouse position of the list, or -1; onIcon says whether the
+ * pointer is on the copy icon at the right of the row. */
 static int rowAt(LPARAM lp, int* onIcon)
 {
 	RECT rc;
@@ -175,23 +182,21 @@ static int rowAt(LPARAM lp, int* onIcon)
 /* One password row: number, the password (digits and symbols coloured), the copy icon. */
 void drawRow(const DRAWITEMSTRUCT* d)
 {
-	HDC dc = d->hDC, mem;
+	HDC mem;
+	BackBuf bb;
 	RECT r = d->rcItem, t, hl;
 	int row = (int)d->itemData, sel = (d->itemState & ODS_SELECTED) != 0, hot;
 	int w = r.right - r.left, h = r.bottom - r.top, iconSz = SC(16), iconX, x, cw, maxX, i, len;
-	HBITMAP bmp;
-	HGDIOBJ ob, of;
+	HGDIOBJ of;
 	TEXTMETRICW tm;
 	SIZE m;
 	HFONT f = fPw;
 	wchar_t num[8];
 	COLORREF bg;
 
-	if ((int)d->itemID < 0 || row < 0 || row >= gPwN) { fillSolid(dc, &r, PAL.card); return; }
+	if ((int)d->itemID < 0 || row < 0 || row >= gPwN) { fillSolid(d->hDC, &r, PAL.card); return; }
 
-	mem = CreateCompatibleDC(dc);
-	bmp = CreateCompatibleBitmap(dc, w, h);
-	ob = SelectObject(mem, bmp);
+	mem = bufBegin(&bb, d->hDC, r.left, r.top, w, h);
 	SetRect(&r, 0, 0, w, h);
 	fillSolid(mem, &r, PAL.card);
 
@@ -265,12 +270,11 @@ void drawRow(const DRAWITEMSTRUCT* d)
 		glyphCopy(mem, iconX, (h - iconSz) / 2, iconSz, on ? PAL.accent : PAL.hint, on ? PAL.accentSoft : (sel || hot) ? bg : PAL.card);
 	}
 
-	BitBlt(dc, d->rcItem.left, d->rcItem.top, w, h, mem, 0, 0, SRCCOPY);
-	SelectObject(mem, ob);
-	DeleteObject(bmp);
-	DeleteDC(mem);
+	bufEnd(&bb);
 }
 
+/* The subclass of the list: the row and icon under the pointer, a click on the copy icon,
+ * Enter to copy, and the text of a row for screen readers. */
 static LRESULT CALLBACK listProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR ref)
 {
 	int row, onIcon;
@@ -288,8 +292,7 @@ static LRESULT CALLBACK listProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT
 		int n;
 
 		row = (int)SendMessageW(hwnd, LB_GETITEMDATA, wp, 0);
-		if (row < 0 || row >= gPwN) break;
-		n = MultiByteToWideChar(CP_UTF8, 0, gPw[row], -1, buf, PW_OUT_MAX) - 1;
+		n = passwordText(row, buf, PW_OUT_MAX);
 		if (n < 0) break;
 		if (msg == LB_GETTEXT && lp) memcpy((wchar_t*)lp, buf, (size_t)(n + 1) * sizeof(wchar_t));
 		SecureZeroMemory(buf, sizeof(buf));
@@ -364,6 +367,7 @@ static LRESULT CALLBACK listProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT
 
 /* ------------------------------------------------------------------ building the window */
 
+/* A text field of the main window, holding at most `limit` characters. */
 static HWND mkEdit(int id, int limit, DWORD style)
 {
 	HWND e = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | style,
@@ -373,18 +377,14 @@ static HWND mkEdit(int id, int limit, DWORD style)
 	return e;
 }
 
+/* Every control of the main window, made once; layout() places them. */
 void buildControls(void)
 {
-	WNDCLASSW wc;
 	int i;
 
-	ZeroMemory(&wc, sizeof(wc));
-	wc.style = CS_HREDRAW | CS_VREDRAW;          /* the track is drawn across the whole width */
-	wc.lpfnWndProc = sliderProc;
-	wc.hInstance = gInst;
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.lpszClassName = L"ForjaSlider";
-	RegisterClassW(&wc);
+	/* the slider's track is drawn across the whole width: redrawn whole on a resize */
+	registerClass(L"ForjaSlider", sliderProc, CS_HREDRAW | CS_VREDRAW);
+	registerClass(L"ForjaStatus", statusProc, 0);
 
 	for (i = 0; i < 3; i++)
 		hSeg[i] = mkButton(hMain, IDC_SEG_CHARS + i, K_SEG, S_MODE_CHARS + i, NULL, PW_CHARS + i, G_NONE);
@@ -415,9 +415,7 @@ void buildControls(void)
 	hTgPinRepeat = mkButton(hMain, IDC_TG_PINREPEAT, K_TOGGLE, S_OPT_NOREPEAT, &gPinNoRepeat, 0, G_NONE);
 	hTgNoSeq     = mkButton(hMain, IDC_TG_NOSEQ, K_TOGGLE, S_OPT_NOSEQ, &gOpt.noSequence, 0, G_NONE);
 
-	hGenerate = mkButton(hMain, IDC_GENERATE, K_PRIMARY, S_GENERATE, NULL, 0, G_NONE);
-	SetWindowLongPtrW(hGenerate, GWL_STYLE, GetWindowLongPtrW(hGenerate, GWL_STYLE) | BS_DEFPUSHBUTTON);
-	SendMessageW(hGenerate, WM_SETFONT, (WPARAM)fBold, FALSE);
+	hGenerate = mkDefaultButton(hMain, IDC_GENERATE, S_GENERATE);
 
 	hTgClear = mkButton(hMain, IDC_TG_CLEAR, K_TOGGLE, S_OPT_CLEAR, &gClearClip, 0, G_NONE);
 	hClearTime = mkButton(hMain, IDC_CLEARTIME, K_DROP, -1, NULL, 0, G_NONE);
@@ -431,18 +429,9 @@ void buildControls(void)
 	SetWindowSubclass(hList, listProc, 1, 0);
 	accSetName(hList, T(S_ACC_LIST));
 
-	{
-		WNDCLASSW sc;
-		ZeroMemory(&sc, sizeof(sc));
-		sc.lpfnWndProc = statusProc;
-		sc.hInstance = gInst;
-		sc.hCursor = LoadCursor(NULL, IDC_ARROW);
-		sc.lpszClassName = L"ForjaStatus";
-		RegisterClassW(&sc);
-		hStatus = CreateWindowExW(0, L"ForjaStatus", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-		                          0, 0, 10, 10, hMain, (HMENU)(INT_PTR)IDC_STATUS, gInst, NULL);
-		accStatusInit(hStatus);
-	}
+	hStatus = CreateWindowExW(0, L"ForjaStatus", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+	                          0, 0, 10, 10, hMain, (HMENU)(INT_PTR)IDC_STATUS, gInst, NULL);
+	accStatusInit(hStatus);
 
 	hTip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, NULL, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
 	                       CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hMain, NULL, gInst, NULL);
@@ -452,7 +441,21 @@ void buildControls(void)
 	allTips(TTM_ADDTOOLW);
 }
 
-/* Puts the options into the controls (numbers, character sets, the slider range). */
+/* A number into a text field, without the field reporting it back as a change. */
+void setNumberText(HWND h, int v)
+{
+	wchar_t w[16];
+	int was = gSyncing;
+
+	_snwprintf(w, 16, L"%d", v);
+	w[15] = 0;
+	gSyncing = 1;
+	SetWindowTextW(h, w);
+	gSyncing = was;
+}
+
+/* Puts the options into the controls (numbers, character sets, the slider range). The slider
+ * reaches 64 characters or 20 PIN digits; the field next to it takes up to 128. */
 void syncControls(void)
 {
 	wchar_t w[PW_SET_MAX];
@@ -464,10 +467,8 @@ void syncControls(void)
 	else                          { lo = PW_MIN_LEN; hi = 64; v = gOpt.length; }
 	SendMessageW(hSlider, SLM_SETRANGE, (WPARAM)lo, (LPARAM)hi);
 	SendMessageW(hSlider, SLM_SETPOS, (WPARAM)v, 0);
-	_snwprintf(w, 16, L"%d", v); w[15] = 0;
-	SetWindowTextW(hLen, w);
-	_snwprintf(w, 16, L"%d", gCount); w[15] = 0;
-	SetWindowTextW(hCnt, w);
+	setNumberText(hLen, v);
+	setNumberText(hCnt, gCount);
 	_snwprintf(w, PW_SET_MAX, L"%hs", gOpt.mode == PW_PIN ? gPinExclude : gCharExclude); w[PW_SET_MAX - 1] = 0;
 	SetWindowTextW(hExclude, w);
 	_snwprintf(w, PW_SET_MAX, L"%hs", gOpt.customSymbols); w[PW_SET_MAX - 1] = 0;
@@ -481,6 +482,7 @@ void syncControls(void)
 
 /* ------------------------------------------------------------------ layout */
 
+/* Moves a control (or hides it, show = 0). While gMeasure is set, nothing is touched. */
 static void place(HWND h, int x, int y, int w, int hh, int show)
 {
 	if (gMeasure) return;
@@ -491,6 +493,7 @@ static void place(HWND h, int x, int y, int w, int hh, int show)
 	SetWindowRgn(h, show && y + hh > gClipBottom ? CreateRectRgn(0, 0, w, maxInt(0, gClipBottom - y)) : NULL, FALSE);
 }
 
+/* A text the main window paints itself (paintMain), recorded for the next paint. */
 static void addLabel(int str, int x, int y, int w, int h, int style)
 {
 	if (gMeasure || gLabelN >= 16) return;
@@ -504,11 +507,13 @@ static void addLabel(int str, int x, int y, int w, int h, int style)
 static void placeField(HWND e, int x, int y, int w, int show)
 {
 	TEXTMETRICW tm;
-	HDC dc = GetDC(e);
-	HGDIOBJ of = SelectObject(dc, fUi);
+	HDC dc;
+	HGDIOBJ of;
 	int eh;
 
-	if (gMeasure) { SelectObject(dc, of); ReleaseDC(e, dc); return; }
+	if (gMeasure) return;
+	dc = GetDC(e);
+	of = SelectObject(dc, fUi);
 	GetTextMetricsW(dc, &tm);
 	SelectObject(dc, of);
 	ReleaseDC(e, dc);
@@ -522,6 +527,7 @@ static void placeField(HWND e, int x, int y, int w, int show)
 	}
 }
 
+/* The width a switch needs: the switch itself, the gap and its text. */
 static int toggleWidth(int str) { return SC(34 + 10 + 10) + textWidth(fUi, T(str), headLen(T(str))); }
 
 /* Switches side by side, going on to the next row when the next one does not fit. Returns
@@ -783,6 +789,8 @@ int layoutTop(int W, int y0, int bandH, int listY)
 	return y;
 }
 
+/* Lays the main window out for its current size: the band, the options, the list, the status
+ * line and the scroll bar. */
 void layout(void)
 {
 	static int busy = 0, again = 0;
@@ -898,6 +906,7 @@ void keepFocusInView(void)
 
 /* ------------------------------------------------------------------ painting */
 
+/* The band at the top: a gradient from the band colour to a lighter tone of the accent. */
 static void paintBand(HDC dc, int W)
 {
 	RECT band;
@@ -934,6 +943,8 @@ static void paintBand(HDC dc, int W)
 	drawText(dc, T(S_APP_SUBTITLE), -1, &band, fSub, PAL.bandSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
+/* Everything of the main window that is not a control: page, band, cards, field frames,
+ * labels and the strength line. */
 void paintMain(HDC dc)
 {
 	RECT rc, r;
@@ -984,15 +995,13 @@ static LRESULT CALLBACK statusProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	if (msg == WM_PAINT)
 	{
 		PAINTSTRUCT ps;
-		HDC dc = BeginPaint(hwnd, &ps), mem = CreateCompatibleDC(dc);
+		BackBuf bb;
+		HDC dc = BeginPaint(hwnd, &ps), mem;
 		RECT rc, r;
-		HBITMAP bmp;
-		HGDIOBJ ob;
 		int m = SC(MARGIN);
 
 		GetClientRect(hwnd, &rc);
-		bmp = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
-		ob = SelectObject(mem, bmp);
+		mem = bufBegin(&bb, dc, 0, 0, rc.right, rc.bottom);
 		fillSolid(mem, &rc, PAL.page);
 		SetRect(&r, m + SC(4), 0, rc.right - m - SC(80), rc.bottom);
 		drawText(mem, gStatusText, -1, &r, fUi,
@@ -1000,10 +1009,7 @@ static LRESULT CALLBACK statusProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 		SetRect(&r, rc.right - m - SC(80), 0, rc.right - m, rc.bottom);
 		drawText(mem, L"v" APP_VERSION, -1, &r, fUi, PAL.hint, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-		BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
-		SelectObject(mem, ob);
-		DeleteObject(bmp);
-		DeleteDC(mem);
+		bufEnd(&bb);
 		EndPaint(hwnd, &ps);
 		return 0;
 	}

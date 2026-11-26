@@ -227,7 +227,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_MENU_GENERATE]  = L"&Generate\tF5",
 	[S_MENU_COPY]      = L"&Copy selected\tCtrl+C",
 	[S_MENU_COPYALL]   = L"Copy &all\tCtrl+Shift+C",
-	[S_MENU_SAVE]      = L"&Save as...\tCtrl+S",
+	[S_MENU_SAVE]      = L"&Save as\x2026\tCtrl+S",
 	[S_MENU_EXIT]      = L"E&xit",
 	[S_MENU_KIND]      = L"&Passwords",
 	[S_MENU_MODE_CHARS]= L"Characters\tCtrl+1",
@@ -272,8 +272,8 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_UPD_ERROR]      = L"Could not check for updates.\n%ls",
 	[S_UPD_ASK_HEAD]   = L"Forja %ls is available",
 	[S_UPD_ASK]        = L"You have %ls. The update downloads and installs by itself: the setup is checked "
-	                     L"against the release's SHA-256 checksums, Forja closes, the new version installs "
-	                     L"with the same options and Forja opens again.",
+	                     L"against the release's SHA-256 checksums, signed by the author, Forja closes, the new "
+	                     L"version installs with the same options and Forja opens again.",
 	[S_UPD_NOW]        = L"Update now",
 	[S_UPD_NOTES]      = L"What's new",
 	[S_UPD_LATER]      = L"Later",
@@ -328,9 +328,9 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"or pattern is favoured.\n"
 		L"# Strength\n"
 		L"The entropy is counted exactly: the number of different passwords the settings can give, every "
-		L"rule included (n bits = 2^n possibilities). Below 50 bits is weak, 64 fair, 80 or more very "
-		L"strong. The guessing time assumes an attacker who has the file and tries 100 billion passwords a "
-		L"second. The defaults (20 characters) give about 122 bits.\n"
+		L"rule included (n bits = 2^n possibilities). Below 36 bits is very weak, below 50 weak, below 64 "
+		L"fair, below 80 strong, and 80 or more very strong. The guessing time assumes an attacker who has "
+		L"the file and tries 100 billion passwords a second. The defaults (20 characters) give about 122 bits.\n"
 		L"# Colours\n"
 		L"In the list, digits are blue and symbols amber, so a password is easier to read back or dictate. "
 		L"What is copied is plain text. View → Theme and colour… chooses the theme (light, dark or as "
@@ -344,12 +344,18 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"history (Win+V) and the cloud clipboard.\n"
 		L"# Updates\n"
 		L"Help \x2192 Check for updates\x2026 asks GitHub whether a newer version has been published; with "
-		L"\"Check for updates daily\" on (the default) this also happens by itself once a day. Nothing about "
-		L"you or your passwords is sent. When there is one, a single question: Update now, What's new or "
-		L"Later. Update now downloads the setup, checks it against the release's SHA-256 checksums (a file "
-		L"that does not match is deleted and never run), closes Forja, installs in silence with the same "
-		L"options and opens Forja again. A portable copy cannot update itself: it offers the download "
-		L"page instead.\n"
+		L"\"Check for updates daily\" on, this also happens by itself once a day. The first time Forja starts, "
+		L"it asks whether you want that. Nothing about you or your passwords is sent. When there is a new "
+		L"version, a single question: Update now, What's new or Later. Update now checks that the release "
+		L"carries the author's signature (without it nothing is installed), downloads the setup, checks it "
+		L"against the release's SHA-256 checksums (a file that does not match is deleted and never run), "
+		L"closes Forja, installs in silence with the same options and opens Forja again. A portable copy "
+		L"cannot update itself: it offers the download page instead.\n"
+		L"# Screen readers and scaling\n"
+		L"Narrator and other screen readers read the whole window: every control by name, the switches and "
+		L"chips as check boxes that are on or off, the slider with its value, each row of the list as its "
+		L"password, and the menus; the status line is read out whenever it changes. Moved to a screen with "
+		L"another scale, the window is drawn again at that scale, sharp.\n"
 		L"# Settings\n"
 		L"They are kept in %APPDATA%\\Forja\\forja.ini. To use the program portable, from a "
 		L"USB stick or a share, put an empty forja.ini next to forja.exe: then that one is used.\n"
@@ -523,7 +529,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_MENU_GENERATE]  = L"生成(&G)\tF5",
 	[S_MENU_COPY]      = L"選択をコピー(&C)\tCtrl+C",
 	[S_MENU_COPYALL]   = L"すべてコピー(&A)\tCtrl+Shift+C",
-	[S_MENU_SAVE]      = L"名前を付けて保存(&S)...\tCtrl+S",
+	[S_MENU_SAVE]      = L"名前を付けて保存(&S)\x2026\tCtrl+S",
 	[S_MENU_EXIT]      = L"終了(&X)",
 	[S_MENU_KIND]      = L"パスワード(&P)",
 	[S_MENU_MODE_CHARS]= L"文字\tCtrl+1",
@@ -569,7 +575,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_UPD_ERROR]      = L"更新を確認できませんでした。\n%ls",
 	[S_UPD_ASK_HEAD]   = L"Forja %ls が公開されています",
 	[S_UPD_ASK]        = L"現在のバージョンは %ls です。更新は自動で行われます。セットアップをダウンロードして"
-	                     L"リリースの SHA-256 チェックサムと照合し、Forja を閉じ、同じ設定のまま新しい"
+	                     L"作者が署名したリリースの SHA-256 チェックサムと照合し、Forja を閉じ、同じ設定のまま新しい"
 	                     L"バージョンをインストールしてから、Forja をもう一度開きます。",
 	[S_UPD_NOW]        = L"今すぐ更新",
 	[S_UPD_NOTES]      = L"更新内容を見る",
@@ -624,7 +630,8 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"パターンが偏ることはありません。\n"
 		L"# 強度\n"
 		L"エントロピーは、設定で作れるパスワードの数をすべての規則を含めて正確に数えたものです"
-		L"(n ビット = 2^n 通り)。50ビット未満は弱く、64ビットで普通、80ビット以上で非常に強力です。"
+		L"(n ビット = 2^n 通り)。36ビット未満は非常に弱く、50ビット未満は弱く、64ビット未満は普通、"
+		L"80ビット未満は強く、80ビット以上で非常に強力です。"
 		L"推測時間は、ファイルを入手した攻撃者が毎秒1000億回試す場合の目安です。初期設定(20文字)で"
 		L"約122ビットです。\n"
 		L"# 色\n"
@@ -640,12 +647,18 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"除外されます。\n"
 		L"# 更新\n"
 		L"「ヘルプ」\x2192「更新の確認\x2026」で、新しいバージョンが公開されているかを GitHub に問い合わせます。"
-		L"「毎日自動で更新を確認」がオン(既定)なら、1日に1回自動でも確認します。あなたやパスワードに"
-		L"関する情報は何も送られません。新しいバージョンがあれば、「今すぐ更新」「更新内容を見る」"
-		L"「後で」の質問が1回だけ表示されます。「今すぐ更新」を選ぶと、セットアップをダウンロードして"
-		L"リリースの SHA-256 チェックサムと照合し(一致しないファイルは削除され、実行されることはありません)、"
-		L"Forja を閉じ、同じ設定のまま自動でインストールして、Forja をもう一度開きます。ポータブル版は"
-		L"自動では更新できないため、代わりにダウンロードページを開くことを提案します。\n"
+		L"「毎日自動で更新を確認」がオンなら、1日に1回自動でも確認します。これを使うかどうかは、Forja の"
+		L"初回起動時に尋ねます。あなたやパスワードに関する情報は何も送られません。新しいバージョンがあれば、"
+		L"「今すぐ更新」「更新内容を見る」「後で」の質問が1回だけ表示されます。「今すぐ更新」を選ぶと、"
+		L"リリースに作者の署名があることを確認し(署名がなければ何もインストールしません)、セットアップを"
+		L"ダウンロードしてリリースの SHA-256 チェックサムと照合し(一致しないファイルは削除され、実行される"
+		L"ことはありません)、Forja を閉じ、同じ設定のまま自動でインストールして、Forja をもう一度開きます。"
+		L"ポータブル版は自動では更新できないため、代わりにダウンロードページを開くことを提案します。\n"
+		L"# スクリーンリーダーと表示倍率\n"
+		L"ナレーターなどのスクリーンリーダーは、ウィンドウ全体を読み上げます。すべてのコントロールの名前、"
+		L"オン・オフのチェックボックスとしてのスイッチとチップ、スライダーの値、一覧の各行のパスワード、"
+		L"メニュー、そして変化するたびに状態表示を読み上げます。表示倍率の異なる画面にウィンドウを移すと、"
+		L"その倍率でくっきりと描き直されます。\n"
 		L"# 設定\n"
 		L"設定は %APPDATA%\\Forja\\forja.ini に保存されます。USB メモリーや共有フォルダーから"
 		L"ポータブルで使うには、forja.exe と同じフォルダーに空の forja.ini を置いてください。\n"
@@ -665,7 +678,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"(CC BY 3.0 US、eff.org/dice)。アイコン: ロンドンの鍛冶屋 Elwell and Taylor の商用カード"
 	                     L"(1766 年ごろ、大英博物館、パブリックドメイン)の金床と槌。",
 	[S_ABOUT_LICENSE]  = L"GNU 一般公衆利用許諾書 第2版 (GPL-2.0-only) のもとで配布されるフリーソフトウェアです。"
-	                     L"無保証です。\x00A9 2026 Gabriel Castiglia",
+	                     L"無保証です。\x00A9 2026 Gabriel Castiglia。",
 },
 
 /* ------------------------------------------------------------------ Spanish */
@@ -818,7 +831,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_MENU_GENERATE]  = L"&Generar\tF5",
 	[S_MENU_COPY]      = L"&Copiar la seleccionada\tCtrl+C",
 	[S_MENU_COPYALL]   = L"Copiar &todas\tCtrl+Mayús+C",
-	[S_MENU_SAVE]      = L"&Guardar como...\tCtrl+S",
+	[S_MENU_SAVE]      = L"&Guardar como\x2026\tCtrl+S",
 	[S_MENU_EXIT]      = L"&Salir",
 	[S_MENU_KIND]      = L"&Contraseñas",
 	[S_MENU_MODE_CHARS]= L"Caracteres\tCtrl+1",
@@ -863,8 +876,8 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_UPD_ERROR]      = L"No se pudo buscar actualizaciones.\n%ls",
 	[S_UPD_ASK_HEAD]   = L"Está disponible Forja %ls",
 	[S_UPD_ASK]        = L"Tenés la %ls. La actualización se descarga e instala sola: el instalador se verifica "
-	                     L"contra las sumas SHA-256 de la versión publicada, Forja se cierra, la versión nueva "
-	                     L"se instala con las mismas opciones y Forja vuelve a abrirse.",
+	                     L"contra las sumas SHA-256 de la versión publicada, firmadas por el autor, Forja se cierra, "
+	                     L"la versión nueva se instala con las mismas opciones y Forja vuelve a abrirse.",
 	[S_UPD_NOW]        = L"Actualizar ahora",
 	[S_UPD_NOTES]      = L"Ver novedades",
 	[S_UPD_LATER]      = L"Más tarde",
@@ -920,9 +933,10 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"y ninguna posición, tipo o patrón sale favorecido.\n"
 		L"# Fuerza\n"
 		L"La entropía se cuenta exactamente: cuántas contraseñas distintas pueden salir con la configuración, "
-		L"con todas las reglas (n bits = 2^n posibilidades). Menos de 50 bits es débil, 64 aceptable, 80 o más "
-		L"muy fuerte. El tiempo para adivinarla supone un atacante que tiene el archivo y prueba 100 mil "
-		L"millones de contraseñas por segundo. Con lo predeterminado (20 caracteres) son unos 122 bits.\n"
+		L"con todas las reglas (n bits = 2^n posibilidades). Menos de 36 bits es muy débil, menos de 50 débil, "
+		L"menos de 64 aceptable, menos de 80 fuerte, y 80 o más muy fuerte. El tiempo para adivinarla supone un "
+		L"atacante que tiene el archivo y prueba 100 mil millones de contraseñas por segundo. Con lo "
+		L"predeterminado (20 caracteres) son unos 122 bits.\n"
 		L"# Colores\n"
 		L"En la lista, los dígitos van en azul y los símbolos en ámbar, para releer o dictar más fácil. Lo que "
 		L"se copia es texto común. En Ver → Tema y color… elegís el tema (claro, oscuro o como Windows) y "
@@ -936,12 +950,19 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"a la nube.\n"
 		L"# Actualizaciones\n"
 		L"Ayuda \x2192 Buscar actualizaciones\x2026 le pregunta a GitHub si se publicó una versión nueva; con "
-		L"«Buscar actualizaciones todos los días» encendido (viene así) eso también se hace solo una vez por "
-		L"día. No se envía nada sobre vos ni sobre tus contraseñas. Si hay una, una sola pregunta: Actualizar "
-		L"ahora, Ver novedades o Más tarde. Actualizar ahora descarga el instalador, lo verifica contra las "
-		L"sumas SHA-256 de la versión publicada (un archivo que no coincide se borra y nunca se ejecuta), "
-		L"cierra Forja, instala en silencio con las mismas opciones y vuelve a abrir Forja. Una copia "
-		L"portable no puede actualizarse sola: en su lugar ofrece abrir la página de descarga.\n"
+		L"«Buscar actualizaciones todos los días» encendido, eso también se hace solo una vez por día. La "
+		L"primera vez que abrís Forja, te pregunta si lo querés. No se envía nada sobre vos ni sobre tus "
+		L"contraseñas. Si hay una versión nueva, una sola pregunta: Actualizar ahora, Ver novedades o Más "
+		L"tarde. Actualizar ahora comprueba que la versión publicada lleve la firma del autor (sin ella no se "
+		L"instala nada), descarga el instalador, lo verifica contra las sumas SHA-256 de la versión publicada "
+		L"(un archivo que no coincide se borra y nunca se ejecuta), cierra Forja, instala en silencio con las "
+		L"mismas opciones y vuelve a abrir Forja. Una copia portable no puede actualizarse sola: en su lugar "
+		L"ofrece abrir la página de descarga.\n"
+		L"# Lectores de pantalla y escala\n"
+		L"El Narrador y los otros lectores de pantalla leen toda la ventana: cada control por su nombre, los "
+		L"interruptores y las fichas como casillas encendidas o apagadas, el deslizador con su valor, cada fila "
+		L"de la lista como su contraseña, y los menús; la línea de estado se lee cada vez que cambia. Si la "
+		L"ventana pasa a una pantalla con otra escala, se vuelve a dibujar a esa escala, nítida.\n"
 		L"# Configuración\n"
 		L"Se guarda en %APPDATA%\\Forja\\forja.ini. Para usarlo portable, desde un pendrive o "
 		L"una carpeta compartida, poné un forja.ini vacío junto a forja.exe: entonces se usa ese.\n"

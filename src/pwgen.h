@@ -9,9 +9,9 @@
     PW_CHARS   random characters. Any of the four classes (lowercase, uppercase, digits,
                symbols) can be switched off; the symbols come from a chosen set (a basic
                set of eleven, all 32 printable ASCII symbols, a minimal "- _ ." set
-               for strict sites, or the user's own). Optional: leave out the ambiguous
-               0 O 1 l I, leave out any characters the user lists, never repeat a character
-               twice in a row, always start with a letter.
+               for strict sites, or the user's own). Optional: leave out the look-alikes
+               0 O 1 l I (and | ` ' " among the symbols), leave out any characters the user
+               lists, never repeat a character twice in a row, always start with a letter.
     PW_WORDS   a passphrase: words drawn from the EFF large word list (7776 words, about
                12.9 bits each), a separator, optional capitals and one digit.
     PW_PIN     digits only, optionally with no repeated neighbours and no runs such as
@@ -48,7 +48,7 @@
 #define PW_SYMBOLS      "!@#$%&*+-=?"                          /* the basic set */
 #define PW_SYMBOLS_ALL  "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"   /* every printable ASCII symbol */
 #define PW_SYMBOLS_MIN  "-_."                                  /* accepted by almost every site */
-#define PW_AMBIGUOUS    "0O1lI|`'\""
+#define PW_AMBIGUOUS    "0O1lI|`'\""                            /* look-alikes: left out by default */
 
 enum { PW_CHARS = 0, PW_WORDS = 1, PW_PIN = 2 };
 enum { PW_SYM_BASIC = 0, PW_SYM_ALL = 1, PW_SYM_MIN = 2, PW_SYM_CUSTOM = 3 };
@@ -93,13 +93,10 @@ void pw_defaults(PwOptions* o);
 int pw_check(const PwOptions* o, int* which);
 
 /* Writes one password and its terminating zero into out[PW_OUT_MAX]. Returns its length,
- * or 0 if the options are impossible or the random number generator failed (out is then
- * emptied). Lengths are clamped to their ranges. */
-int pw_make(const PwOptions* o, char* out);
-
-/* The same, and `why` (may be NULL) receives PW_FAIL_NONE, or why nothing was made:
- * PW_FAIL_RULES (pw_check refused the options), PW_FAIL_TRIES (no draw followed the rules
- * within the tries allowed) or PW_FAIL_RNG (the random number generator failed). */
+ * or 0 when nothing was made (out is then emptied); lengths are clamped to their ranges.
+ * `why` (may be NULL) receives PW_FAIL_NONE, or why nothing was made: PW_FAIL_RULES
+ * (pw_check refused the options), PW_FAIL_TRIES (no draw followed the rules within the
+ * tries allowed) or PW_FAIL_RNG (the random number generator failed). */
 int pw_make_ex(const PwOptions* o, char* out, int* why);
 
 /* log2 of the number of different passwords these options can produce (exact for
@@ -109,15 +106,5 @@ double pw_entropy(const PwOptions* o);
 /* How many different characters a position can take (characters and PIN), or the number
  * of words in the list (passphrases). */
 int pw_pool(const PwOptions* o);
-
-/* The symbols in use, after the set, the ambiguous ones and the exclusions. out[PW_SET_MAX]. */
-void pw_symbols_in_use(const PwOptions* o, char* out);
-
-/* Number of words in the built-in list, and one of them (for the test tools). */
-int pw_word_count(void);
-const char* pw_word(int i);
-
-/* The standard rules with a given length and choice of ambiguous characters. */
-int pw_generate(int length, int avoidAmbiguous, char* out);
 
 #endif

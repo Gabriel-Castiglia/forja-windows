@@ -7,7 +7,7 @@
   SPDX-License-Identifier: GPL-2.0-only
 
   Updates that install themselves: the parts that do not touch the window. The flow (one
-  question, download, checksum, silent setup, reopen) lives in forja.c; this file has the
+  question, download, checksum, silent setup, reopen) lives in updui.c; this file has the
   pure functions it relies on, the HTTPS client (WinHTTP), SHA-256 (BCrypt) and the test of
   whether this copy is the installed one or a portable one.
 **/

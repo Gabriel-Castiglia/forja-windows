@@ -7,8 +7,9 @@ SPDX-License-Identifier: GPL-2.0-only
     python tools/audit_sources.py [root]
 
   1. every source file carries the copyright and licence header (GPL-2.0-only, SPDX);
-  2. comments are in English: outside ui_strings.h and make_guide.py (the translated interface
-     and guide text), no Japanese characters and no Spanish accented letters;
+  2. comments are in English: outside the translated files (ui_strings.h, make_guide.py, the
+     READMEs, the changelogs and the setup script), no Japanese characters
+     and no Spanish accented letters;
   3. line endings: .bat files CRLF only, every other text file LF only;
   4. the version is written only in src/version.h, and its numbers and string agree;
   5. every string id of the enum has a text in all three languages.
@@ -23,7 +24,8 @@ ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().pare
 TEXT = {".c", ".h", ".rc", ".py", ".ps1", ".bat", ".xml", ".txt", ".md", ".iss"}
 NEEDS_AUTHOR = {".c", ".h", ".rc", ".py", ".ps1", ".bat"}
 SKIP = set()
-TRANSLATED = {"ui_strings.h", "make_guide.py", "README.md", "Forja.iss"}   # text in three languages
+TRANSLATED = {"ui_strings.h", "make_guide.py", "README.md", "README.es.md", "README.ja.md",
+              "CHANGELOG.md", "CHANGELOG.es.md", "CHANGELOG.ja.md", "Forja.iss"}   # text in three languages
 
 JAPANESE = "[" + chr(0x3040) + "-" + chr(0x30FF) + chr(0x4E00) + "-" + chr(0x9FFF) + "]"
 SPANISH = "[" + "".join(chr(c) for c in (0xE1, 0xE9, 0xED, 0xF3, 0xFA, 0xF1, 0xC1, 0xC9, 0xCD, 0xD3, 0xDA, 0xD1, 0xBF, 0xA1)) + "]"
@@ -54,9 +56,9 @@ for p in files:
     if p.name not in TRANSLATED | SKIP and p.suffix.lower() != ".xml":
         for n, line in enumerate(text.splitlines(), 1):
             if re.search(JAPANESE, line):
-                fail(f"{rel}:{n}: Japanese text outside ui_strings.h")
+                fail(f"{rel}:{n}: Japanese text outside the translated files")
             if re.search(SPANISH, line):
-                fail(f"{rel}:{n}: Spanish text outside ui_strings.h")
+                fail(f"{rel}:{n}: Spanish text outside the translated files")
 
 # versions
 src = ROOT / "src"

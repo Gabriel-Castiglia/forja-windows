@@ -24,6 +24,7 @@ static int gSavedN = 0;
 static int gTestFails = 0;
 static FILE* gTestLog;
 
+/* One line of the report: "ok" or "BAD", and what was checked. */
 static void testCheck(int ok, const char* what)
 {
 	if (!ok) gTestFails++;
@@ -69,6 +70,8 @@ static void saveUserClipboard(void)
 	CloseClipboard();
 }
 
+/* Puts the saved formats back. The saved content had gone to the clipboard history when it
+ * was first copied; unless it carried its own history format, it is kept out this time. */
 static int restoreUserClipboard(void)
 {
 	int i, history = 0;
@@ -86,7 +89,6 @@ static int restoreUserClipboard(void)
 		if (GetClipboardFormatNameW(gSaved[i].fmt, name, 64) && !lstrcmpiW(name, L"CanIncludeInClipboardHistory")) history = 1;
 		if (!SetClipboardData(gSaved[i].fmt, gSaved[i].h)) GlobalFree(gSaved[i].h);
 	}
-	/* the content went to the history when it was first copied: not a second time */
 	if (gSavedN && !history)
 	{
 		putDwordFormat(L"CanIncludeInClipboardHistory", 0);
@@ -100,20 +102,34 @@ static int restoreUserClipboard(void)
 /* A copy made by "another program": a second window of ours, without any marker formats. */
 static void otherCopies(HWND other, const wchar_t* text)
 {
-	size_t bytes = (wcslen(text) + 1) * sizeof(wchar_t);
 	HGLOBAL h;
 	int i;
 
 	for (i = 0; i < 10 && !OpenClipboard(other); i++) Sleep(20);
 	EmptyClipboard();
-	h = GlobalAlloc(GMEM_MOVEABLE, bytes);
-	if (h)
+	h = globalCopy(text, (wcslen(text) + 1) * sizeof(wchar_t));
+	if (h && !SetClipboardData(CF_UNICODETEXT, h)) GlobalFree(h);
+	CloseClipboard();
+}
+
+/* A SHA-256 of the text on the clipboard, so the user's text can be checked when it comes
+ * back without keeping a copy of it. 1 = there was text and it was hashed. */
+static int clipboardTextHash(BYTE out[32])
+{
+	HANDLE h;
+	const wchar_t* p;
+	int ok = 0;
+
+	if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !openClipboardRetry()) return 0;
+	h = GetClipboardData(CF_UNICODETEXT);
+	p = h ? (const wchar_t*)GlobalLock(h) : NULL;
+	if (p)
 	{
-		memcpy(GlobalLock(h), text, bytes);
+		ok = upd_sha256(p, wcslen(p) * sizeof(wchar_t), out);
 		GlobalUnlock(h);
-		if (!SetClipboardData(CF_UNICODETEXT, h)) GlobalFree(h);
 	}
 	CloseClipboard();
+	return ok;
 }
 
 static int clipboardIs(const wchar_t* text)
@@ -205,21 +221,7 @@ int selfTest(const wchar_t* logPath)
 	          parseDuration("-5") == -1, "/clearafter: empty, x, 5h, -5 are refused");
 
 	/* 2. the clipboard: the user's content is saved first and put back at the end */
-	hadText = IsClipboardFormatAvailable(CF_UNICODETEXT);
-	{
-		/* only a hash of the user's text is kept, to check that it comes back */
-		HANDLE h;
-		const wchar_t* p;
-		hadText = hadText && openClipboardRetry();
-		if (hadText)
-		{
-			h = GetClipboardData(CF_UNICODETEXT);
-			p = h ? (const wchar_t*)GlobalLock(h) : NULL;
-			hadText = p && upd_sha256(p, wcslen(p) * sizeof(wchar_t), before);
-			if (p) GlobalUnlock(h);
-			CloseClipboard();
-		}
-	}
+	hadText = clipboardTextHash(before);
 	saveUserClipboard();
 
 	gClearClip = 1;
@@ -288,19 +290,8 @@ int selfTest(const wchar_t* logPath)
 	testCheck(restoreUserClipboard(), "clipboard: the user's content is put back");
 	if (hadText)
 	{
-		HANDLE h;
-		const wchar_t* p;
 		BYTE after[32];
-		int same = 0;
-		if (openClipboardRetry())
-		{
-			h = GetClipboardData(CF_UNICODETEXT);
-			p = h ? (const wchar_t*)GlobalLock(h) : NULL;
-			same = p && upd_sha256(p, wcslen(p) * sizeof(wchar_t), after) && !memcmp(after, before, 32);
-			if (p) GlobalUnlock(h);
-			CloseClipboard();
-		}
-		testCheck(same, "clipboard: the user's text is back, unchanged");
+		testCheck(clipboardTextHash(after) && !memcmp(after, before, 32), "clipboard: the user's text is back, unchanged");
 	}
 	forgetClipboard();
 

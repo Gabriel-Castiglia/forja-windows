@@ -14,11 +14,21 @@
 
 /* ------------------------------------------------------------------ command line */
 
+/* Opening a file for writing truncates it: what was already written goes, so no half list
+ * of passwords is left behind. */
+static void emptyFile(const wchar_t* path)
+{
+	FILE* f = _wfopen(path, L"wb");
+
+	if (f) fclose(f);
+}
+
+/* /out: count passwords to a file, one per line. Returns the exit code (see forja.c). */
 int writeAuto(const wchar_t* path, const PwOptions* o, int count)
 {
 	FILE* f = path ? _wfopen(path, L"wb") : NULL;
 	char pw[PW_OUT_MAX];
-	int i;
+	int i, bad;
 
 	if (!f) return 2;
 	if (pw_check(o, NULL) != PW_OK) { fclose(f); return 5; }
@@ -27,20 +37,22 @@ int writeAuto(const wchar_t* path, const PwOptions* o, int count)
 		int why;
 		if (!pw_make_ex(o, pw, &why))
 		{
-			/* what was already written goes too: no half list of passwords is left behind */
 			SecureZeroMemory(pw, sizeof(pw));
 			fclose(f);
-			f = _wfopen(path, L"wb");
-			if (f) fclose(f);
+			emptyFile(path);
 			return why == PW_FAIL_RNG ? 3 : 6;
 		}
 		fputs(pw, f);
 		fputs("\r\n", f);
 	}
 	SecureZeroMemory(pw, sizeof(pw));
-	return fclose(f) == 0 ? 0 : 2;
+	/* a write that failed (a full disk) also leaves the file empty, as the other failures do */
+	bad = ferror(f);
+	if (fclose(f) != 0 || bad) { emptyFile(path); return 2; }
+	return 0;
 }
 
+/* /entropy: "bits pool check" to a file. */
 int writeEntropy(const wchar_t* path, const PwOptions* o)
 {
 	FILE* f = path ? _wfopen(path, L"wb") : NULL;
@@ -50,7 +62,8 @@ int writeEntropy(const wchar_t* path, const PwOptions* o)
 	return fclose(f) == 0 ? 0 : 2;
 }
 
-/* Draws the window (or the Help / About box in front of it) into a 32-bit BMP. */
+/* /shot: draws the window (or the Help, About or Theme window in front of it) into a 32-bit
+ * BMP file. Returns 0, or 4 when it could not be drawn or written. */
 int saveShot(HWND w, const wchar_t* path)
 {
 	RECT r;
@@ -78,7 +91,7 @@ int saveShot(HWND w, const wchar_t* path)
 	bmp = CreateDIBSection(screen, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
 	old = SelectObject(mem, bmp);
 
-	if (PrintWindow(w, mem, PW_RENDERFULLCONTENT))
+	if (bmp && bits && PrintWindow(w, mem, PW_RENDERFULLCONTENT))
 	{
 		FILE* f = path ? _wfopen(path, L"wb") : NULL;
 		if (f)
@@ -104,6 +117,7 @@ int saveShot(HWND w, const wchar_t* path)
 	return ok ? 0 : 4;
 }
 
+/* Runs the message loop for ms milliseconds, so that windows can paint and timers fire. */
 void pump(DWORD ms)
 {
 	DWORD until = GetTickCount() + ms;
@@ -131,10 +145,11 @@ const wchar_t* widePathArg(const wchar_t* key)
 	return NULL;
 }
 
-/* Command-line options onto a set of options. Returns 1 if any password option was given. */
-int parseOptions(PwOptions* o, int* noRepeat, char* exclude, int* count, int* preset)
+/* The password options of the command line, laid over the set of options given (unknown
+ * options are left to WinMain). /len sets the length of the kind chosen with /mode. */
+void parseOptions(PwOptions* o, int* noRepeat, char* exclude, int* count, int* preset)
 {
-	int i, any = 0, len = -1;
+	int i, len = -1;
 
 	for (i = 1; i < __argc; i++)
 	{
@@ -142,7 +157,6 @@ int parseOptions(PwOptions* o, int* noRepeat, char* exclude, int* count, int* pr
 
 		if (a[0] != '/' && a[0] != '-') continue;
 		a++;
-		any = 1;
 		if      (!_strnicmp(a, "mode:", 5))     o->mode = !_stricmp(a + 5, "words") ? PW_WORDS : !_stricmp(a + 5, "pin") ? PW_PIN : PW_CHARS;
 		else if (!_strnicmp(a, "len:", 4))      len = atoi(a + 4);
 		else if (!_strnicmp(a, "words:", 6))    o->words = atoi(a + 6);
@@ -172,7 +186,6 @@ int parseOptions(PwOptions* o, int* noRepeat, char* exclude, int* count, int* pr
 		else if (!_strnicmp(a, "preset:", 7))   *preset = atoi(a + 7);
 	}
 	if (len > 0) { if (o->mode == PW_PIN) o->pinLength = len; else o->length = len; }
-	return any;
 }
 
 /* The value of /clearafter: "90" or "90s" seconds, "2m" minutes, "0" or "off" never.

@@ -14,20 +14,31 @@
 
 /* ------------------------------------------------------------------ clipboard */
 
-/* A clipboard format whose presence tells Windows what to do with the copy. */
+/* A block of movable memory holding a copy of `bytes` bytes, ready for SetClipboardData,
+ * or NULL. */
+HGLOBAL globalCopy(const void* data, size_t bytes)
+{
+	HGLOBAL h = GlobalAlloc(GMEM_MOVEABLE, bytes);
+	void* p = h ? GlobalLock(h) : NULL;
+
+	if (!p) { if (h) GlobalFree(h); return NULL; }
+	memcpy(p, data, bytes);
+	GlobalUnlock(h);
+	return h;
+}
+
+/* A clipboard format whose presence tells Windows what to do with the copy (the clipboard
+ * must be open). */
 void putDwordFormat(const wchar_t* name, DWORD value)
 {
 	UINT fmt = RegisterClipboardFormatW(name);
 	HGLOBAL h;
 
-	if (!fmt) return;
-	h = GlobalAlloc(GMEM_MOVEABLE, sizeof(DWORD));
-	if (!h) return;
-	*(DWORD*)GlobalLock(h) = value;
-	GlobalUnlock(h);
+	if (!fmt || (h = globalCopy(&value, sizeof(value))) == NULL) return;
 	if (!SetClipboardData(fmt, h)) GlobalFree(h);
 }
 
+/* Opens the clipboard for the main window; 1 = open (the caller closes it). */
 int openClipboardRetry(void)
 {
 	int i;
@@ -41,19 +52,18 @@ int openClipboardRetry(void)
 	return 0;
 }
 
+/* Puts text on the clipboard, out of its history, and remembers a hash of it (never the text)
+ * to recognise it later. 1 = done. */
 int putClipboard(const wchar_t* text)
 {
-	size_t bytes = (wcslen(text) + 1) * sizeof(wchar_t);
 	HGLOBAL h;
 
 	if (!openClipboardRetry()) return 0;
 
 	EmptyClipboard();
 
-	h = GlobalAlloc(GMEM_MOVEABLE, bytes);
+	h = globalCopy(text, (wcslen(text) + 1) * sizeof(wchar_t));
 	if (!h) { CloseClipboard(); return 0; }
-	memcpy(GlobalLock(h), text, bytes);
-	GlobalUnlock(h);
 	if (!SetClipboardData(CF_UNICODETEXT, h)) { GlobalFree(h); CloseClipboard(); return 0; }
 
 	/* keep it out of Win+V history, the cloud clipboard and clipboard monitors */
@@ -67,6 +77,7 @@ int putClipboard(const wchar_t* text)
 	return 1;
 }
 
+/* Nothing on the clipboard is ours any more. */
 void forgetClipboard(void)
 {
 	gClipHave = 0;
@@ -181,6 +192,7 @@ static void showCopied(void)
 	setStatus(ST_OK, buf);
 }
 
+/* After a copy: the check mark on the row (or on every row, -2), the countdown, the status. */
 static void afterCopy(int row)
 {
 	gMarkRow = row;
@@ -196,9 +208,7 @@ void copyRow(int row)
 {
 	wchar_t w[PW_OUT_MAX];
 
-	if (row < 0 || row >= gPwN) return;
-
-	MultiByteToWideChar(CP_ACP, 0, gPw[row], -1, w, PW_OUT_MAX);
+	if (passwordText(row, w, PW_OUT_MAX) < 0) return;
 	if (!putClipboard(w)) { SecureZeroMemory(w, sizeof(w)); setStatus(ST_ERR, T(S_ST_CLIP_FAIL)); return; }
 	SecureZeroMemory(w, sizeof(w));
 
@@ -218,8 +228,10 @@ void copyAll(void)
 	 * one-row list is just the password */
 	for (i = 0; i < gPwN; i++)
 	{
+		int k;
 		if (i) { w[n++] = L'\r'; w[n++] = L'\n'; }
-		n += MultiByteToWideChar(CP_ACP, 0, gPw[i], -1, w + n, PW_OUT_MAX) - 1;
+		k = passwordText(i, w + n, PW_OUT_MAX);
+		if (k > 0) n += k;
 	}
 	w[n] = 0;
 
@@ -232,6 +244,7 @@ void copyAll(void)
 	afterCopy(-2);
 }
 
+/* Ctrl+C: the text of a focused text field, otherwise the selected password. */
 void copySelected(void)
 {
 	HWND f = GetFocus();
@@ -243,6 +256,7 @@ void copySelected(void)
 	copyRow((int)SendMessageW(hList, LB_GETCURSEL, 0, 0));
 }
 
+/* Once a second while a copy waits to be wiped. */
 void clipTick(void)
 {
 	if (!clipboardStillOurs())

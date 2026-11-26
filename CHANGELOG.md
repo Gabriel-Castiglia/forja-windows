@@ -1,5 +1,27 @@
 # Changelog
 
+**English** · [Español](CHANGELOG.es.md) · [日本語](CHANGELOG.ja.md)
+
+## 3.1.1 — 2026-11-26
+
+- The menu bar keeps its colour after a drop-down list (profile, symbols, separator, clipboard time) has been
+  opened: the brush it was painted with used to be deleted while the bar still used it.
+- `/out`: a write that fails (a full disk, say) now also leaves the file empty, with exit code 2, as every other
+  failure does.
+- Updates: when the check or the download cannot be started, the status line no longer stays on "Checking for
+  updates…" or "Downloading…".
+- Help: the strength levels are given in full (below 36 bits very weak, below 50 weak, below 64 fair, below 80
+  strong, 80 or more very strong); the update section tells of the first start's question and of the author's
+  signature; a new section describes screen readers and per-monitor scaling. The update question says that the
+  checksums are signed by the author. "Save as…" has an ellipsis like the other menu items.
+- User guides: in the program's own colours, taken from its default theme, with the title band and the icon as at
+  the top of the window; the strength levels corrected; the Japanese and Spanish wording matches the program.
+- README in three complete files — `README.md` (English), `README.es.md` (Spanish), `README.ja.md` (Japanese) —
+  and this changelog also in Spanish and Japanese.
+- Internal: code repeated in several places merged into shared helpers (off-screen drawing, cached brushes, modal
+  windows, default buttons, window classes, task dialogs, the text of a password), unused functions removed,
+  memory locks checked, the window class no longer points at an icon destroyed at start-up, comments reviewed.
+
 ## 3.1.0 — 2026-11-26
 
 - **The first start asks before checking for updates**: with no `CheckUpdates` in `forja.ini` (a new install, or

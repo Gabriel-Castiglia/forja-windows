@@ -49,7 +49,7 @@
   are painted by the main window into a back buffer; the interactive parts are owner-drawn
   BUTTONs (so Tab, Space, Enter and focus work as usual) plus a small slider class of our
   own; text input stays in plain EDIT controls. Shapes are anti-aliased with GDI+ (its flat
-  C API, declared below); text stays GDI with ClearType.
+  C API, declared in forja.h); text stays GDI with ClearType.
 
   Implementation notes:
     - fonts and brushes are released only after nothing points at them any more;
@@ -158,7 +158,6 @@ void effectiveOptions(PwOptions* o)
 }
 
 /* ------------------------------------------------------------------ profiles */
-
 
 const int PRESET_STR[P_COUNT] = {
 	S_PRESET_STANDARD, S_PRESET_MAX, S_PRESET_NOSYM, S_PRESET_MINSYM,
@@ -273,6 +272,17 @@ void wipePasswords(void)
 	gPwN = 0;
 }
 
+/* Password `row` as UTF-16 text in out (cap characters, at least PW_OUT_MAX). Returns its
+ * length, or -1 when there is no such row. The caller wipes out after use. */
+int passwordText(int row, wchar_t* out, int cap)
+{
+	int n;
+
+	if (row < 0 || row >= gPwN) return -1;
+	n = MultiByteToWideChar(CP_UTF8, 0, gPw[row], -1, out, cap);
+	return n > 0 ? n - 1 : -1;
+}
+
 void sayGenerated(void)
 {
 	if (gPwN == 1) setStatus(ST_OK, T(S_ST_GENERATED_ONE));
@@ -385,13 +395,8 @@ static void fieldNumber(HWND e, int lo, int hi, int* v)
 
 static void stepCount(int delta)
 {
-	wchar_t w[16];
-
 	gCount = clampInt(gCount + delta, 1, MAX_COUNT);
-	_snwprintf(w, 16, L"%d", gCount); w[15] = 0;
-	gSyncing = 1;
-	SetWindowTextW(hCnt, w);
-	gSyncing = 0;
+	setNumberText(hCnt, gCount);
 	onOptionsChanged(1);
 }
 
@@ -424,13 +429,9 @@ static void onCommand(HWND hwnd, int id, int code, HWND ctl)
 	case IDC_SLIDER:
 		if (code == SLN_CHANGE)
 		{
-			wchar_t w[16];
 			int v = (int)SendMessageW(hSlider, SLM_GETPOS, 0, 0);
 			setSliderValue(v);
-			_snwprintf(w, 16, L"%d", v); w[15] = 0;
-			gSyncing = 1;
-			SetWindowTextW(hLen, w);
-			gSyncing = 0;
+			setNumberText(hLen, v);
 			onOptionsChanged(0);
 		}
 		return;
@@ -531,19 +532,13 @@ static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		HDC dc = BeginPaint(hwnd, &ps), mem = CreateCompatibleDC(dc);
+		BackBuf bb;
+		HDC dc = BeginPaint(hwnd, &ps);
 		RECT rc;
-		HBITMAP bmp;
-		HGDIOBJ ob;
 
 		GetClientRect(hwnd, &rc);
-		bmp = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
-		ob = SelectObject(mem, bmp);
-		paintMain(mem);
-		BitBlt(dc, 0, 0, rc.right, rc.bottom, mem, 0, 0, SRCCOPY);
-		SelectObject(mem, ob);
-		DeleteObject(bmp);
-		DeleteDC(mem);
+		paintMain(bufBegin(&bb, dc, 0, 0, rc.right, rc.bottom));
+		bufEnd(&bb);
 		EndPaint(hwnd, &ps);
 		return 0;
 	}
@@ -593,24 +588,15 @@ static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		return 0;
 	}
 
+	/* the text fields and the list are painted in the theme's colours */
 	case WM_CTLCOLOREDIT:
 		SetBkColor((HDC)wp, PAL.field);
 		SetTextColor((HDC)wp, PAL.text);
-		{
-			static HBRUSH br = NULL;
-			static COLORREF brc = CLR_NONE;
-			if (brc != PAL.field) { if (br) DeleteObject(br); br = CreateSolidBrush(PAL.field); brc = PAL.field; }
-			return (LRESULT)br;
-		}
+		return (LRESULT)solidBrush(PAL.field);
 
 	case WM_CTLCOLORLISTBOX:
 		SetBkColor((HDC)wp, PAL.card);
-		{
-			static HBRUSH br = NULL;
-			static COLORREF brc = CLR_NONE;
-			if (brc != PAL.card) { if (br) DeleteObject(br); br = CreateSolidBrush(PAL.card); brc = PAL.card; }
-			return (LRESULT)br;
-		}
+		return (LRESULT)solidBrush(PAL.card);
 
 	case WM_SETTINGCHANGE:
 		if (lp && 0 == lstrcmpiW((const wchar_t*)lp, L"ImmersiveColorSet") && gTheme == 0) { refreshTheme(); buildMenu(hwnd); }
@@ -817,7 +803,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	/* a screenshot may ask for a kind of password or a profile */
 	if (shotPath)
 	{
-		PwOptions o = gOpt;
+		PwOptions o;
 		int nr = 0, count = gCount, preset = -1;
 		char ex[PW_SET_MAX] = "";
 
@@ -847,15 +833,16 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 
 	makeFonts();
 	refreshTheme();
-	makeIcons();
 
+	/* The class icon is the executable's own, shared and never destroyed; the window gets the
+	 * icon tinted in the accent colour through WM_SETICON (makeIcons). */
 	ZeroMemory(&wc, sizeof(wc));
 	wc.style = CS_HREDRAW | CS_VREDRAW;
 	wc.lpfnWndProc = wndProc;
 	wc.hInstance = inst;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.lpszClassName = L"Forja";
-	wc.hIcon = icBig;
+	wc.hIcon = LoadIconW(inst, MAKEINTRESOURCEW(IDI_APP));
 	RegisterClassW(&wc);
 
 	/* the default size is the client the design needs: the whole band and five rows in the

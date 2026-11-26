@@ -16,8 +16,8 @@
 
 #define WH_VER_MAJOR    3
 #define WH_VER_MINOR    1
-#define WH_VER_PATCH    0
-#define WH_VERSION_STR  "3.1.0"
+#define WH_VER_PATCH    1
+#define WH_VERSION_STR  "3.1.1"
 #define WH_DATE_STR     "2026-11-26"
 #define WH_REPO_STR     "github.com/Gabriel-Castiglia/forja-windows"
 

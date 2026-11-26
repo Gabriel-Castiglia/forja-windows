@@ -8,28 +8,56 @@ SPDX-License-Identifier: GPL-2.0-only
     python tools/make_guide.py
 
 The screenshots in docs/images are taken from the program itself with /shot (see the
-header of src/forja.c). The version is read from src/forja.c, so the guide
-cannot name another one.
+header of src/forja.c). The version is read from src/version.h, so the guide cannot
+name another one, and the colours from the default theme in src/theme.c (light, black
+accent), so the guide looks like the program.
 """
 
 import re
+from datetime import datetime
 from pathlib import Path
 
 from docx import Document
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 IMAGES = DOCS / "images"
+ICON = ROOT / "assets" / "app256.png"
 _VERSION_H = (ROOT / "src" / "version.h").read_text(encoding="utf-8")
 VERSION = re.search(r'#define WH_VERSION_STR\s+"([\d.]+)"', _VERSION_H).group(1)
 DATE = re.search(r'#define WH_DATE_STR\s+"([\d-]+)"', _VERSION_H).group(1)
 REPO = re.search(r'#define WH_REPO_STR\s+"([^"]+)"', _VERSION_H).group(1)
 AUTHOR = "Gabriel Castiglia"
-ACCENT = RGBColor(0x22, 0x24, 0x2C)       # the default black of the icon
-GREY = RGBColor(0x5F, 0x6B, 0x78)
+
+
+def _theme_palette() -> dict:
+    """The colours of the program's default look, read from src/theme.c: the light branch of
+    makePalette() and the first (black) accent. Returned as 'RRGGBB' strings."""
+    src = (ROOT / "src" / "theme.c").read_text(encoding="utf-8")
+    rgb = r"RGB\(0x([0-9A-Fa-f]{2}),\s*0x([0-9A-Fa-f]{2}),\s*0x([0-9A-Fa-f]{2})\)"
+    black = re.search(r"\{\s*S_ACCENT_BLACK,\s*" + rgb + r",\s*" + rgb + r",\s*" + rgb, src).groups()
+    light = re.search(r"else\s*\{(.*?)\n\t\}", src[src.index("void makePalette"):], re.S).group(1)
+    pal = {k: (int(r, 16), int(g, 16), int(b, 16)) for k, r, g, b in re.findall(r"PAL\.(\w+)\s*=\s*" + rgb, light)}
+    accent, tile = tuple(int(x, 16) for x in black[0:3]), tuple(int(x, 16) for x in black[6:9])
+    m = re.search(r"PAL\.band\s*=\s*mix\(t,\s*" + rgb + r",\s*([\d.]+)\)", light)
+    to, t = tuple(int(x, 16) for x in m.groups()[:3]), float(m.group(4))
+    mix = lambda a, b, f: tuple(int(x + (y - x) * f + 0.5) for x, y in zip(a, b))
+    pal["accent"] = accent
+    pal["band"] = mix(tile, to, t)                                   # as makePalette() mixes it
+    pal["bandSub"] = mix((0xFF, 0xFF, 0xFF), pal["band"], 0.32)
+    return {k: "%02X%02X%02X" % v for k, v in pal.items()}
+
+
+PAL = _theme_palette()
+COLOR = {k: RGBColor.from_string(v) for k, v in PAL.items()}
+ACCENT = COLOR["accent"]                  # headings, bullets and numbers: the default accent
+TEXT = COLOR["text"]                      # body text
+GREY = COLOR["hint"]                      # subtitle, captions and footer: the hint colour
 
 # Each guide: a list of blocks. ("h", text) heading, ("p", text) paragraph,
 # ("b", text) bullet, ("n", text) numbered item, ("img", file, caption), ("code", text).
@@ -71,7 +99,7 @@ GUIDES = {
             ("b", "Save (the arrow icon, or Ctrl+S): all of them to a text file, one per line. Keep the file somewhere safe or delete it once used."),
             ("h", "7. How the passwords are made, and their strength"),
             ("p", "Every character or word comes from the Windows cryptographic random number generator (BCryptGenRandom), drawn without bias. When a password breaks one of the rules \u2014 a kind missing, a repeated neighbour, a run \u2014 it is thrown away and drawn again, never patched. So every password that follows the rules is exactly as likely as any other: no position, kind or pattern is favoured. Rules that leave so few passwords that drawing one would take too long (for example only digits, no repeats and a length of 128) are refused at once: Generate is greyed out and the status line says which, so relax one of them."),
-            ("p", "The entropy is counted exactly, every rule included: n bits means 2^n possible passwords. Below 50 bits is weak, 64 fair, 80 or more very strong. The guessing time assumes an attacker who has the file and tries 100 billion passwords a second. The default 20 characters give about 122 bits."),
+            ("p", "The entropy is counted exactly, every rule included: n bits means 2^n possible passwords. Below 36 bits is very weak, below 50 weak, below 64 fair, below 80 strong, and 80 or more very strong. The guessing time assumes an attacker who has the file and tries 100 billion passwords a second. The default 20 characters give about 122 bits."),
             ("h", "8. Clipboard protection"),
             ("p", "Every copy is kept out of the Windows clipboard history (Win+V), the cloud clipboard and clipboard monitors. Above the list, Clear clipboard after is on by default with 2 minutes; the drop-down beside it offers 10 s, 30 s, 1, 2, 5 and 10 minutes, and choosing a time also switches clearing on."),
             ("b", "When the time is up, the copy is wiped — but only if the clipboard still holds exactly what Forja put there. Forja remembers the clipboard’s sequence number and a SHA-256 of the text, never the text itself. Whatever you or another program copied afterwards is left alone."),
@@ -107,7 +135,7 @@ GUIDES = {
         "subtitle": f"ユーザーガイド  \u00B7  バージョン {VERSION}  \u00B7  {DATE}  \u00B7  {AUTHOR}",
         "blocks": [
             ("h", "1. 概要"),
-            ("p", "Forja は、強力なランダムパスワード・パスフレーズ・PIN をお使いのコンピューター上で作ります。メールで送る zip・7z・rar ファイル、新しいアカウント、Wi-Fi、ロックなどに使えます。何も保存・送信しません。パスワードはコピーまたは保存するまで、このウィンドウの中にだけ存在します。"),
+            ("p", "Forja は、強力なランダムパスワード・パスフレーズ・PIN をお使いのコンピューター上で作ります。メールで送る zip・7z・rar ファイル、新しいアカウント、Wi-Fi、錠前などに使えます。何も保存・送信しません。パスワードはコピーまたは保存するまで、このウィンドウの中にだけ存在します。"),
             ("p", "名前の由来: Forja はスペイン語で「鍛冶場」。金床の上で槌を打って金属を形づくるように、ここでは一つひとつのパスワードが純粋な偶然から生まれます。バージョン 2.1 までは Wyrmhold という名前でした。"),
             ("h", "2. インストールとアンインストール"),
             ("p", "Windows 10 または 11、64 ビットの Intel または AMD プロセッサー(x64)。ARM プロセッサー用の版はありません。Forja-Setup-" + VERSION + ".exe を実行し、セットアップの言語(英語・日本語・スペイン語)を選びます。既定では管理者権限なしで現在のユーザーにインストールされます。最初のページで全ユーザー向けのインストールも選べます。スタートメニューに Forja とユーザーガイドが追加され、デスクトップにもショートカットが作られます（不要ならチェックを外してください）。プログラムはセットアップで選んだ言語で起動します。"),
@@ -124,7 +152,7 @@ GUIDES = {
             ("h", "4. 3 つの種類"),
             ("b", "文字(4\u2013128 文字):長さあたり最も強力です。入力せず貼り付ける場合に最適です。使う種類(a\u2013z、A\u2013Z、0\u20139、記号)と記号の組を選びます:基本(! @ # $ % & * + - = ?)、全32種(印字可能なすべての記号)、最小限(- _ .)、自分で指定。オプション:「紛らわしい文字なし」(0 O 1 l I | と引用符)、「同じ文字を連続させない」、「英字で始める」、ほかの文字は「除外」欄に入力。オンにした種類は必ず 1 文字以上含まれます。"),
             ("b", "パスフレーズ(3\u201312 単語):EFF の 7,776 語のリストから選んだランダムな単語。例:Copper-Showroom-Wrecking7-Salute。長くなりますが、覚える・読み上げる・スマホで入力するのがずっと楽です。区切り:ハイフン、スペース、ドット、アンダースコア、なし、ランダムな数字(より強力)。オプション:「大文字にする」(各単語の先頭)、「数字を1つ入れる」。6 単語で約 80 ビットです。"),
-            ("b", "PIN(4\u2013128 桁):数字のみ。オプション:「同じ文字を連続させない」、「123 や 987 のような連番なし」。カード・スマホ・ロックのように誤入力の回数が制限される場所でのみ安全です。"),
+            ("b", "PIN(4\u2013128 桁):数字のみ。オプション:「同じ文字を連続させない」、「123 や 987 のような連番なし」。カード・スマホ・錠前のように誤入力の回数が制限される場所でのみ安全です。"),
             ("h", "5. プロファイルと、一部の文字を受け付けないサイト"),
             ("p", "「プロファイル」ボタン(「パスワード」メニューにもあります)ですべてを一度に設定できます:標準(20 文字、基本の記号)、最強(32 文字、すべての記号)、記号なし、最小限の記号(- _ . のみ、英字で始める)、短め(12 文字、最大文字数が少ない場合)、Wi-Fi(スマホやテレビで入力しやすい)、パスフレーズ(6 単語)、PIN(6 桁)。自分で変更するとボタンは「カスタム」になります。"),
             ("b", "記号を受け付けない:プロファイル「記号なし」、または #$% のチップをオフにします。"),
@@ -138,7 +166,7 @@ GUIDES = {
             ("b", "保存(矢印アイコン、または Ctrl+S):すべてをテキストファイルに 1 行ずつ書き出します。安全な場所に置くか、使い終わったら削除してください。"),
             ("h", "7. パスワードの作り方と強度"),
             ("p", "すべての文字・単語は Windows の暗号用乱数生成器(BCryptGenRandom)から偏りなく選ばれます。規則に反するパスワード(種類が欠けている、同じ文字が隣り合う、連番など)は修正せずに捨てて引き直します。そのため規則を満たすすべてのパスワードが等しい確率で選ばれ、特定の位置・種類・パターンが有利になることはありません。規則が厳しすぎてパスワードを作るのに時間がかかりすぎる場合(例:数字のみ・繰り返しなし・長さ 128)は、すぐに拒否されます。「生成」が無効になり、ステータス行に理由が表示されるので、どれかの規則を緩めてください。"),
-            ("p", "エントロピーはすべての規則を含めて正確に数えます。n ビットは 2^n 通りのパスワードを意味します。50 ビット未満は弱い、64 はまずまず、80 以上は非常に強力です。推測時間は、ファイルを持つ攻撃者が毎秒 1000 億回試す場合の目安です。既定の 20 文字で約 122 ビットです。"),
+            ("p", "エントロピーはすべての規則を含めて正確に数えます。n ビットは 2^n 通りのパスワードを意味します。36 ビット未満は非常に弱い、50 ビット未満は弱い、64 ビット未満は普通、80 ビット未満は強い、80 ビット以上は非常に強力です。推測時間は、ファイルを持つ攻撃者が毎秒 1000 億回試す場合の目安です。既定の 20 文字で約 122 ビットです。"),
             ("h", "8. クリップボードの保護"),
             ("p", "コピーは常に Windows のクリップボード履歴(Win+V)、クラウド、クリップボード監視ツールから除外されます。一覧の上の「クリップボードを自動消去」は既定でオン、時間は 2 分です。横のドロップダウンで 10 秒・30 秒・1 分・2 分・5 分・10 分を選べます。時間を選ぶと自動消去もオンになります。"),
             ("b", "時間がたつとコピーは消去されます。ただし、クリップボードの中身が Forja の入れたものとまったく同じ場合だけです。Forja はクリップボードのシーケンス番号とテキストの SHA-256 を覚えておき、テキストそのものは保持しません。後からあなたやほかのプログラムがコピーしたものには手を触れません。"),
@@ -163,7 +191,7 @@ GUIDES = {
             ("h", "13. ソースからのビルド"),
             ("p", "ソースは C(Win32)です。C:\\msys64 に MSYS2 の mingw-w64 GCC があれば、build.bat が build\\forja.exe を作ります。tools\\make_installer.ps1 は Inno Setup 6 でセットアップを作ります。tools\\run_checks.ps1 と tools\\check_options.py はパスワードと正確なエントロピーを独立した計算と照合し、tools\\check_clipboard.ps1 はクリップボードを確認します。run_checks.ps1 は forja.exe /selftest も実行します。テスト前にクリップボードの中身を保存して最後に元に戻し、あなたの設定には一切触れません。"),
             ("h", "14. ライセンスとクレジット"),
-            ("p", "GNU 一般公衆利用許諾書 第 2 版(GPL-2.0-only)のもとで配布されるフリーソフトウェアです。使用・複製・研究・改変ができ、再配布する場合は同じライセンスでソースコードとともに行う必要があります。無保証です。全文は LICENSE.txt にあります。\u00A9 2026 Gabriel Castiglia."),
+            ("p", "GNU 一般公衆利用許諾書 第 2 版(GPL-2.0-only)のもとで配布されるフリーソフトウェアです。使用・複製・研究・改変ができ、再配布する場合は同じライセンスでソースコードとともに行う必要があります。無保証です。全文は LICENSE.txt にあります。\u00A9 2026 Gabriel Castiglia。"),
             ("p", "ソースコード・リリース・更新: https://" + REPO),
             ("p", "パスフレーズの単語:Electronic Frontier Foundation の EFF large word list(CC BY 3.0 US、eff.org/dice)。アイコン: ロンドンの鍛冶屋 Elwell and Taylor の商用カード(1766 年ごろ、大英博物館、パブリックドメイン)の金床と槌。"),
         ],
@@ -194,18 +222,18 @@ GUIDES = {
             ("b", "PIN (4 a 128 dígitos): solo números. Opciones: Sin repetir seguidos, Sin seguidos tipo 123 o 987. Seguro solo donde los intentos fallidos están limitados, como en tarjetas, celulares y cerraduras."),
             ("h", "5. Perfiles, y sitios que no aceptan algunos caracteres"),
             ("p", "El botón Perfil (también el menú Contraseñas) configura todo de una vez: Estándar (20 caracteres, símbolos básicos), Máxima (32 caracteres, todos los símbolos), Sin símbolos, Símbolos mínimos (solo - _ ., empezando con letra), Corta (12 caracteres, para un máximo bajo), Wi-Fi (fácil de tipear en un celular o un televisor), Frase (6 palabras) y PIN (6 dígitos). Si cambiás algo por tu cuenta, el botón dice Personalizado."),
-            ("b", "El sitio no acepta símbolos: perfil Sin símbolos, o apagá el chip #$%."),
+            ("b", "El sitio no acepta símbolos: perfil Sin símbolos, o apagá la ficha #$%."),
             ("b", "Acepta solo algunos símbolos: Símbolos \u2192 Mínimos, o Los míos, y escribí exactamente los que el sitio permite."),
             ("b", "Rechaza caracteres puntuales: escribilos en Excluir."),
             ("b", "Tiene un largo máximo: bajá el largo, o perfil Corta; compensá usando todas las clases."),
             ("b", "Pide empezar con letra, o no repetir caracteres: encendé Empezar con letra, o Sin repetir seguidos."),
             ("h", "6. Copiar y guardar"),
             ("b", "Una contraseña: el ícono de copiar al final de su fila, doble clic, o Enter o Ctrl+C sobre la fila seleccionada. El ícono se vuelve una tilde por un momento."),
-            ("b", "Todas: el ícono de copiar arriba a la derecha de la lista, o Ctrl+Shift+C, una por línea."),
+            ("b", "Todas: el ícono de copiar arriba a la derecha de la lista, o Ctrl+Mayús+C, una por línea."),
             ("b", "Guardar (el ícono de la flecha, o Ctrl+S): todas a un archivo de texto, una por línea. Guardá el archivo en un lugar seguro o borralo después de usarlo."),
             ("h", "7. Cómo se generan, y su fuerza"),
             ("p", "Cada carácter o palabra sale del generador criptográfico de números aleatorios de Windows (BCryptGenRandom), sin sesgo. Cuando una contraseña rompe una regla \u2014 falta una clase, dos vecinos iguales, una seguidilla como 123 \u2014 se descarta y se sortea de nuevo, nunca se parcha. Así, todas las contraseñas que cumplen las reglas son igual de probables: ninguna posición, clase o patrón queda favorecido. Las reglas que dejan tan pocas contraseñas que sortear una tardaría demasiado (por ejemplo, solo dígitos, sin repetir y largo 128) se rechazan enseguida: Generar queda deshabilitado y la línea de estado dice por qué; aflojá alguna."),
-            ("p", "La entropía se cuenta exacta, con todas las reglas: n bits son 2^n contraseñas posibles. Menos de 50 bits es débil, 64 aceptable, 80 o más muy fuerte. El tiempo para adivinarla supone un atacante que tiene el archivo y prueba 100.000 millones de contraseñas por segundo. Los 20 caracteres de fábrica dan unos 122 bits."),
+            ("p", "La entropía se cuenta exacta, con todas las reglas: n bits son 2^n contraseñas posibles. Menos de 36 bits es muy débil, menos de 50 débil, menos de 64 aceptable, menos de 80 fuerte, y 80 o más muy fuerte. El tiempo para adivinarla supone un atacante que tiene el archivo y prueba 100.000 millones de contraseñas por segundo. Los 20 caracteres de fábrica dan unos 122 bits."),
             ("h", "8. Protección del portapapeles"),
             ("p", "Toda copia queda fuera del historial del portapapeles de Windows (Win+V), del portapapeles en la nube y de los monitores de portapapeles. Arriba de la lista, Borrar portapapeles a los viene encendido con 2 minutos; el desplegable de al lado ofrece 10 s, 30 s, 1, 2, 5 y 10 minutos, y elegir un tiempo también enciende el borrado."),
             ("b", "Cuando pasa el tiempo, lo copiado se borra — pero solo si el portapapeles sigue teniendo exactamente lo que puso Forja. Forja recuerda el número de secuencia del portapapeles y un SHA-256 del texto, nunca el texto. Lo que vos u otro programa hayan copiado después no se toca."),
@@ -253,6 +281,56 @@ def set_font(run, latin, east, size=None, bold=None, color=None):
     if color is not None: run.font.color.rgb = color
 
 
+def shade(element, fill: str) -> None:
+    """Fills a paragraph or a table cell with a solid colour ('RRGGBB')."""
+    pr = element.get_or_add_pPr() if element.tag == qn("w:p") else element.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), fill)
+    pr.append(shd)
+
+
+def border(paragraph, side: str, color: str, size: int = 6, space: int = 2) -> None:
+    """A line on one side of a paragraph (size in eighths of a point)."""
+    ppr = paragraph._p.get_or_add_pPr()
+    bdr = ppr.find(qn("w:pBdr"))
+    if bdr is None:
+        bdr = OxmlElement("w:pBdr")
+        ppr.append(bdr)
+    line = OxmlElement(f"w:{side}")
+    for k, v in (("val", "single"), ("sz", str(size)), ("space", str(space)), ("color", color)):
+        line.set(qn(f"w:{k}"), v)
+    bdr.append(line)
+
+
+def band(doc, g: dict) -> None:
+    """The title band, as at the top of the program's window: the icon, the name in white and
+    the subtitle in the band's lighter tone, on the band colour."""
+    f, e = g["font"], g["east"]
+    t = doc.add_table(rows=1, cols=2)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    t.autofit = False
+    widths = (Cm(2.4), Cm(14.2))
+    for col, cell, w in zip(t.columns, t.rows[0].cells, widths):
+        col.width = cell.width = w
+        shade(cell._tc, PAL["band"])
+    icon = t.rows[0].cells[0].paragraphs[0]
+    icon.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    icon.paragraph_format.space_before = Pt(6)
+    icon.paragraph_format.space_after = Pt(6)
+    icon.add_run().add_picture(str(ICON), width=Cm(1.6))
+    cell = t.rows[0].cells[1]
+    p = cell.paragraphs[0]
+    p.paragraph_format.space_before = Pt(8)
+    p.paragraph_format.space_after = Pt(0)
+    set_font(p.add_run(g["title"]), f, e, 24, True, RGBColor(0xFF, 0xFF, 0xFF))
+    p = cell.add_paragraph()
+    p.paragraph_format.space_after = Pt(8)
+    set_font(p.add_run(g["subtitle"]), f, e, 10, False, COLOR["bandSub"])
+    doc.add_paragraph().paragraph_format.space_after = Pt(4)
+
+
 def build(lang: str, g: dict) -> Path:
     doc = Document()
     sec = doc.sections[0]
@@ -263,17 +341,12 @@ def build(lang: str, g: dict) -> Path:
 
     normal = doc.styles["Normal"]
     normal.font.size = Pt(10.5)
+    normal.font.color.rgb = TEXT
     normal.paragraph_format.space_after = Pt(6)
     normal.paragraph_format.line_spacing = 1.15
     f, e = g["font"], g["east"]
 
-    p = doc.add_paragraph()
-    p.add_run().add_picture(str(ROOT / "assets" / "app256.png"), width=Cm(1.6))
-    set_font(p.add_run("  " + g["title"]), f, e, 24, True, ACCENT)
-    p.paragraph_format.space_after = Pt(2)
-    p = doc.add_paragraph()
-    set_font(p.add_run(g["subtitle"]), f, e, 10, False, GREY)
-    p.paragraph_format.space_after = Pt(14)
+    band(doc, g)
 
     n = 0
     for b in g["blocks"]:
@@ -284,6 +357,7 @@ def build(lang: str, g: dict) -> Path:
             p.paragraph_format.space_before = Pt(12)
             p.paragraph_format.space_after = Pt(4)
             p.paragraph_format.keep_with_next = True
+            border(p, "bottom", PAL["border"])
             set_font(p.add_run(b[1]), f, e, 13, True, ACCENT)
         elif kind == "p":
             set_font(doc.add_paragraph().add_run(b[1]), f, e)
@@ -296,9 +370,14 @@ def build(lang: str, g: dict) -> Path:
             set_font(p.add_run(("\u2022" if kind == "b" else f"{n}.") + "\u00A0\u00A0"), f, e, bold=(kind == "n"), color=ACCENT)
             set_font(p.add_run(b[1]), f, e)
         elif kind == "code":
+            # a text field of the program: the field colour, framed in the field border
             p = doc.add_paragraph()
             p.paragraph_format.left_indent = Cm(0.8)
-            set_font(p.add_run(b[1]), "Consolas", "Consolas", 9.5)
+            p.paragraph_format.right_indent = Cm(0.2)
+            shade(p._p, PAL["field"])
+            for side in ("top", "left", "bottom", "right"):
+                border(p, side, PAL["fieldBorder"], 4, 4)
+            set_font(p.add_run(b[1]), "Consolas", "Consolas", 9.5, color=TEXT)
         elif kind == "img":
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -312,9 +391,13 @@ def build(lang: str, g: dict) -> Path:
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     set_font(footer.add_run(f"{g['title']}  \u00B7  v{VERSION}  \u00B7  {AUTHOR}"), f, e, 8.5, False, GREY)
 
-    doc.core_properties.author = AUTHOR
-    doc.core_properties.title = g["title"]
-    doc.core_properties.company = ""
+    # the document's own properties name only the author; nothing else is carried over
+    cp = doc.core_properties
+    cp.author = cp.last_modified_by = AUTHOR
+    cp.title = g["title"]
+    cp.subject = g["subtitle"].split("\u00B7")[0].strip()
+    cp.comments = cp.keywords = cp.category = ""
+    cp.created = cp.modified = datetime.strptime(DATE, "%Y-%m-%d")     # the release date, not the template's
     out = DOCS / f"forja_guide_{lang}.docx"
     doc.save(out)
     return out

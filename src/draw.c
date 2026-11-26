@@ -6,11 +6,54 @@
   Date: November 25, 2026
   SPDX-License-Identifier: GPL-2.0-only
 
-  Drawing primitives (anti-aliased shapes through the GDI+ flat API, text, fills) and the
-  small glyphs: copy, check mark, save, chevron, plus and minus.
+  Drawing primitives (off-screen buffers, cached brushes, anti-aliased shapes through the
+  GDI+ flat API, text, fills) and the small glyphs: copy, check mark, save, chevron, plus
+  and minus.
 **/
 
 #include "forja.h"
+
+/* ------------------------------------------------------------------ off-screen drawing */
+
+/* Everything is painted into a memory bitmap first and copied to the screen in one go, so
+ * nothing flickers. bufBegin returns the memory DC to draw on, with (0, 0) at its top-left
+ * corner; bufEnd copies it to (x, y) of the target DC and frees what bufBegin made. */
+HDC bufBegin(BackBuf* b, HDC dst, int x, int y, int w, int h)
+{
+	b->dst = dst;
+	b->x = x; b->y = y; b->w = w; b->h = h;
+	b->mem = CreateCompatibleDC(dst);
+	b->bmp = CreateCompatibleBitmap(dst, w, h);
+	b->old = SelectObject(b->mem, b->bmp);
+	return b->mem;
+}
+
+void bufEnd(BackBuf* b)
+{
+	BitBlt(b->dst, b->x, b->y, b->w, b->h, b->mem, 0, 0, SRCCOPY);
+	SelectObject(b->mem, b->old);
+	DeleteObject(b->bmp);
+	DeleteDC(b->mem);
+}
+
+/* A solid brush of colour c, made once and kept for the life of the program. Brushes handed
+ * to Windows (WM_CTLCOLOR* replies, menu backgrounds) may still be in use after the call that
+ * gave them, so they are never deleted. Only a few colours ever ask for one (the field, card
+ * and menu colours of the two themes); should more come, the oldest slot is reused. */
+HBRUSH solidBrush(COLORREF c)
+{
+	static struct { COLORREF c; HBRUSH b; } cache[16];
+	static int n = 0, next = 0;
+	int i;
+
+	for (i = 0; i < n; i++)
+		if (cache[i].c == c) return cache[i].b;
+	if (n < 16) i = n++;
+	else { i = next; next = (next + 1) % 16; DeleteObject(cache[i].b); }
+	cache[i].c = c;
+	cache[i].b = CreateSolidBrush(c);
+	return cache[i].b;
+}
 
 /* ------------------------------------------------------------------ drawing primitives */
 
@@ -158,6 +201,13 @@ int headLen(const wchar_t* s)
 {
 	const wchar_t* tab = wcschr(s, L'\t');
 	return tab ? (int)(tab - s) : (int)wcslen(s);
+}
+
+/* The part before the tab of such a string, copied into buf (cap characters). */
+void headCopy(wchar_t* buf, int cap, const wchar_t* s)
+{
+	_snwprintf(buf, cap, L"%.*ls", headLen(s), s);
+	buf[cap - 1] = 0;
 }
 
 /* ------------------------------------------------------------------ glyphs */

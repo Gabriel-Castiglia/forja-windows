@@ -18,11 +18,12 @@
  * when GitHub has a newer release, one question, and then everything happens alone. The
  * release's SHA256SUMS.txt must carry the author's signature (release.sig, update.c
  * upd_signature_valid; without it nothing is downloaded), the setup is downloaded and checked
- * against that list (a file that does not match is deleted, never run); the window closes (a copy waiting to be wiped goes, as on any exit);
- * the setup runs in silence keeping the install options, waits for this process to be gone
- * (/WHWAITPID) and starts the program again (/WHRELAUNCH, see installer/Forja.iss). A
- * portable copy cannot be installed over: it is offered the download page. The network work
- * runs on a thread of its own, which reports through WM_APP_UPDATE and WM_APP_PROGRESS. */
+ * against that list (a file that does not match is deleted, never run); the window closes
+ * (a copy waiting to be wiped goes, as on any exit); the setup runs in silence keeping the
+ * install options, waits for this process to be gone (/WHWAITPID) and starts the program
+ * again (/WHRELAUNCH, see installer/Forja.iss). A portable copy cannot be installed over: it
+ * is offered the download page. The network work runs on a thread of its own, which reports
+ * through WM_APP_UPDATE and WM_APP_PROGRESS. */
 
 #define UPD_AGENT     L"Forja/" APP_VERSION
 #define UPD_PAGE      L"https://" APP_REPO L"/releases/latest"
@@ -43,8 +44,15 @@ static UpdJob* gUpdCheck = NULL;        /* the check running, if any (only the w
 static int gUpdDownloading = 0;
 static wchar_t gUpdTag[64];             /* the version being downloaded, for the status line */
 
-typedef struct { char* p; size_t n, cap; } MemSink;
-typedef struct { HANDLE f; int lastPct; ULONGLONG lastMb; } FileSink;
+typedef struct { char* p; size_t n, cap; } MemSink;          /* a download kept in memory */
+typedef struct { HANDLE f; int lastPct; ULONGLONG lastMb; } FileSink;   /* ...or written to a file */
+
+/* Releases the read handle that keeps the downloaded setup from being changed (stage 1). */
+static void unlockSetup(UpdJob* j)
+{
+	if (j->stage && j->lock && j->lock != INVALID_HANDLE_VALUE) CloseHandle(j->lock);
+	j->lock = INVALID_HANDLE_VALUE;
+}
 
 static int sinkMem(void* ctx, const BYTE* d, DWORD n, ULONGLONG done, ULONGLONG total)
 {
@@ -73,11 +81,12 @@ static int sinkFile(void* ctx, const BYTE* d, DWORD n, ULONGLONG done, ULONGLONG
 	return 1;
 }
 
+/* Hands the finished job to the window (onUpdateDone), or frees it when the window is gone. */
 static void finishJob(UpdJob* j)
 {
-	if (!PostMessageW(hMain, WM_APP_UPDATE, 0, (LPARAM)j))              /* the window is gone */
+	if (!PostMessageW(hMain, WM_APP_UPDATE, 0, (LPARAM)j))
 	{
-		if (j->stage && j->lock && j->lock != INVALID_HANDLE_VALUE) CloseHandle(j->lock);
+		unlockSetup(j);
 		free(j);
 	}
 }
@@ -244,20 +253,28 @@ static DWORD WINAPI downloadThread(void* arg)
 	return 0;
 }
 
+/* Starts the check (stage 0) or the download (stage 1) on a thread of its own. If it cannot
+ * start, nothing is left pending: the status line goes back to Ready. */
 static void startUpdateJob(int stage, int interactive, const UpdRelease* rel)
 {
 	UpdJob* j = (UpdJob*)calloc(1, sizeof(UpdJob));
-	HANDLE t;
+	HANDLE t = NULL;
 
-	if (!j) return;
-	j->stage = stage;
-	j->interactive = interactive;
-	if (rel) j->rel = *rel;
-	gUpdBusy = 1;
-	if (stage == 0) gUpdCheck = j;
-	t = CreateThread(NULL, 0, stage ? downloadThread : checkThread, j, 0, NULL);
-	if (t) CloseHandle(t);
-	else { free(j); gUpdBusy = 0; gUpdDownloading = 0; gUpdCheck = NULL; }
+	if (j)
+	{
+		j->stage = stage;
+		j->interactive = interactive;
+		if (rel) j->rel = *rel;
+		gUpdBusy = 1;
+		if (stage == 0) gUpdCheck = j;
+		t = CreateThread(NULL, 0, stage ? downloadThread : checkThread, j, 0, NULL);
+	}
+	if (t) { CloseHandle(t); return; }
+	free(j);
+	gUpdBusy = 0;
+	gUpdCheck = NULL;
+	if (interactive || gUpdDownloading) setStatus(ST_PLAIN, T(S_ST_READY));
+	gUpdDownloading = 0;
 }
 
 /* One daily check for the automatic ones, stamped in the .ini. */
@@ -271,6 +288,7 @@ static int dailyCheckDue(void)
 	return now - last >= 24 * 3600 || now < last;
 }
 
+/* Help -> Check for updates (interactive), or the daily check at start-up. */
 void checkUpdates(int interactive)
 {
 	wchar_t buf[32];
@@ -289,6 +307,7 @@ void checkUpdates(int interactive)
 	startUpdateJob(0, interactive, NULL);
 }
 
+/* A message box saying why the check or the update failed. */
 static void updateMessage(int fmt, const UpdJob* j)
 {
 	wchar_t why[256], msg[640];
@@ -300,21 +319,12 @@ static void updateMessage(int fmt, const UpdJob* j)
 	MessageBoxW(hMain, msg, L"Forja", MB_OK | MB_ICONWARNING);
 }
 
-/* The one question: 2 = Update now, 1 = What's new, 0 = Later (or the dialog closed). */
-static int askUpdate(const wchar_t* tag)
+/* A question with its own buttons (ids from 100 up; the first button is the default), over
+ * the main window. Returns the id of the button pressed, or 0 when the dialog was closed. */
+static int ask(const wchar_t* head, const wchar_t* body, TASKDIALOG_BUTTON* b, int n)
 {
 	TASKDIALOGCONFIG tc;
-	TASKDIALOG_BUTTON b[3];
-	wchar_t head[256], body[1024];
 	int r = 0;
-
-	_snwprintf(head, 256, T(S_UPD_ASK_HEAD), tag);
-	head[255] = 0;
-	_snwprintf(body, 1024, T(S_UPD_ASK), APP_VERSION);
-	body[1023] = 0;
-	b[0].nButtonID = 102; b[0].pszButtonText = T(S_UPD_NOW);
-	b[1].nButtonID = 101; b[1].pszButtonText = T(S_UPD_NOTES);
-	b[2].nButtonID = 100; b[2].pszButtonText = T(S_UPD_LATER);
 
 	ZeroMemory(&tc, sizeof(tc));
 	tc.cbSize = sizeof(tc);
@@ -325,10 +335,28 @@ static int askUpdate(const wchar_t* tag)
 	tc.pszMainIcon = TD_INFORMATION_ICON;
 	tc.pszMainInstruction = head;
 	tc.pszContent = body;
-	tc.cButtons = 3;
+	tc.cButtons = (UINT)n;
 	tc.pButtons = b;
-	tc.nDefaultButton = 102;
+	tc.nDefaultButton = b[0].nButtonID;
 	if (FAILED(TaskDialogIndirect(&tc, &r, NULL, NULL))) return 0;
+	return r;
+}
+
+/* The one question: 2 = Update now, 1 = What's new, 0 = Later (or the dialog closed). */
+static int askUpdate(const wchar_t* tag)
+{
+	TASKDIALOG_BUTTON b[3];
+	wchar_t head[256], body[1024];
+	int r;
+
+	_snwprintf(head, 256, T(S_UPD_ASK_HEAD), tag);
+	head[255] = 0;
+	_snwprintf(body, 1024, T(S_UPD_ASK), APP_VERSION);
+	body[1023] = 0;
+	b[0].nButtonID = 102; b[0].pszButtonText = T(S_UPD_NOW);
+	b[1].nButtonID = 101; b[1].pszButtonText = T(S_UPD_NOTES);
+	b[2].nButtonID = 100; b[2].pszButtonText = T(S_UPD_LATER);
+	r = ask(head, body, b, 3);
 	return r == 102 ? 2 : r == 101 ? 1 : 0;
 }
 
@@ -339,33 +367,21 @@ static int askUpdate(const wchar_t* tag)
  * the next start. A start by the setup after an update means the check was on: it stays on. */
 void askAutoUpdateOnce(int updated)
 {
-	TASKDIALOGCONFIG tc;
 	TASKDIALOG_BUTTON b[2];
-	int r = 0;
+	int r;
 
 	if (gNoSave || iniInt(L"CheckUpdates", -1) != -1) return;
 	if (updated) { gAutoUpdate = 1; iniSetInt(L"CheckUpdates", 1); return; }
 
 	b[0].nButtonID = 101; b[0].pszButtonText = T(S_FIRST_UPD_YES);
 	b[1].nButtonID = 100; b[1].pszButtonText = T(S_FIRST_UPD_NO);
-	ZeroMemory(&tc, sizeof(tc));
-	tc.cbSize = sizeof(tc);
-	tc.hwndParent = hMain;
-	tc.hInstance = gInst;
-	tc.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
-	tc.pszWindowTitle = L"Forja";
-	tc.pszMainIcon = TD_INFORMATION_ICON;
-	tc.pszMainInstruction = T(S_FIRST_UPD_HEAD);
-	tc.pszContent = T(S_FIRST_UPD_BODY);
-	tc.cButtons = 2;
-	tc.pButtons = b;
-	tc.nDefaultButton = 101;
-	if (FAILED(TaskDialogIndirect(&tc, &r, NULL, NULL))) r = 0;
+	r = ask(T(S_FIRST_UPD_HEAD), T(S_FIRST_UPD_BODY), b, 2);
 	gAutoUpdate = (r == 101);
 	if (r == 101 || r == 100) iniSetInt(L"CheckUpdates", gAutoUpdate);
 	buildMenu(hMain);
 }
 
+/* "Version x is available": a question that opens the download page on Yes. */
 static void offerPage(int fmt, const wchar_t* tag)
 {
 	wchar_t msg[640];
@@ -376,6 +392,8 @@ static void offerPage(int fmt, const wchar_t* tag)
 		ShellExecuteW(hMain, L"open", UPD_PAGE, NULL, NULL, SW_SHOWNORMAL);
 }
 
+/* The download's progress on the status line: a percentage, or megabytes when the size
+ * is not known. */
 void onUpdateProgress(int pct, ULONGLONG done)
 {
 	wchar_t amount[32], buf[256];
@@ -389,6 +407,7 @@ void onUpdateProgress(int pct, ULONGLONG done)
 	setStatus(ST_PLAIN, buf);
 }
 
+/* A job is over (on the window's thread): the answer of the check, or the setup to run. */
 void onUpdateDone(UpdJob* j)
 {
 	gUpdBusy = 0;
@@ -458,14 +477,14 @@ void onUpdateDone(UpdJob* j)
 		if (ShellExecuteExW(&sei))
 		{
 			/* the setup has started (SEE_MASK_NOASYNC): the file can be let go */
-			if (j->lock && j->lock != INVALID_HANDLE_VALUE) CloseHandle(j->lock);
+			unlockSetup(j);
 			free(j);
 			DestroyWindow(hMain);
 			return;
 		}
 		j->err = GetLastError();                /* refused, e.g. the elevation prompt cancelled */
 	}
-	if (j->lock && j->lock != INVALID_HANDLE_VALUE) { CloseHandle(j->lock); j->lock = INVALID_HANDLE_VALUE; }
+	unlockSetup(j);
 	setStatus(ST_PLAIN, T(S_ST_READY));
 	updateMessage(S_UPD_FAILED, j);
 	free(j);

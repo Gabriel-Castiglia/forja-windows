@@ -43,18 +43,14 @@ static void clearTimeText(int secs, wchar_t* buf, int cap)
 	int i;
 
 	for (i = 0; i < CLEAR_CHOICE_N; i++)
-		if (CLEAR_CHOICES[i] == secs)
-		{
-			const wchar_t* s = T(S_CLR_10S + i);
-			_snwprintf(buf, cap, L"%.*ls", headLen(s), s);
-			buf[cap - 1] = 0;
-			return;
-		}
+		if (CLEAR_CHOICES[i] == secs) { headCopy(buf, cap, T(S_CLR_10S + i)); return; }
 	if (secs % 60 == 0) _snwprintf(buf, cap, T(S_CLR_FMT_M), secs / 60);
 	else                _snwprintf(buf, cap, T(S_CLR_FMT_S), secs);
 	buf[cap - 1] = 0;
 }
 
+/* What a drop-down button shows: the profile, the symbol set, the clipboard time or the
+ * separator (without the hint after the tab). */
 static void dropText(HWND h, wchar_t* buf, int cap)
 {
 	if (h == hProfile)
@@ -62,19 +58,11 @@ static void dropText(HWND h, wchar_t* buf, int cap)
 		int p = currentPreset();
 		const wchar_t* name = p >= 0 ? T(PRESET_STR[p]) : T(S_PRESET_CUSTOM);
 		_snwprintf(buf, cap, T(S_PROFILE_FMT), headLen(name), name);
+		buf[cap - 1] = 0;
 	}
-	else if (h == hSymSet)
-	{
-		const wchar_t* s = T(S_SYM_BASIC + gOpt.symbolSet);
-		_snwprintf(buf, cap, L"%.*ls", headLen(s), s);
-	}
+	else if (h == hSymSet)    headCopy(buf, cap, T(S_SYM_BASIC + gOpt.symbolSet));
 	else if (h == hClearTime) clearTimeText(gClearSecs, buf, cap);
-	else
-	{
-		const wchar_t* s = T(S_SEP_HYPHEN + gOpt.separator);
-		_snwprintf(buf, cap, L"%.*ls", headLen(s), s);
-	}
-	buf[cap - 1] = 0;
+	else                      headCopy(buf, cap, T(S_SEP_HYPHEN + gOpt.separator));
 }
 
 /* ------------------------------------------------------------------ for screen readers */
@@ -108,7 +96,7 @@ static void accButton(HWND h, Ctl* c)
 	}
 	else if (c->kind == K_ICON) lstrcpynW(name, T(c->glyph == G_SAVE ? S_TIP_SAVE : S_TIP_COPYALL), 200);
 	else if (c->kind == K_STEP) lstrcpynW(name, T(c->glyph == G_MINUS ? S_ACC_FEWER : S_ACC_MORE), 200);
-	else if (c->kind != K_PRIMARY && c->str >= 0) _snwprintf(name, 200, L"%.*ls", headLen(T(c->str)), T(c->str));
+	else if (c->kind != K_PRIMARY && c->str >= 0) headCopy(name, 200, T(c->str));
 	name[199] = 0;
 	if (name[0] && (!GetWindowTextW(h, cur, 200) || wcscmp(cur, name))) SetWindowTextW(h, name);
 
@@ -162,16 +150,14 @@ void accRefresh(HWND parent)
 
 void drawButton(const DRAWITEMSTRUCT* d)
 {
-	HDC dc = d->hDC;
 	Ctl* c = ctlOf(d->hwndItem);
 	RECT r = d->rcItem, t;
 	int down = (d->itemState & ODS_SELECTED) != 0, dis = (d->itemState & ODS_DISABLED) != 0;
 	int focus = (d->itemState & ODS_FOCUS) && !(d->itemState & ODS_NOFOCUSRECT);
 	int hot = c && c->hot;
 	COLORREF under = underColour(d->hwndItem);
+	BackBuf bb;
 	HDC mem;
-	HBITMAP bmp;
-	HGDIOBJ ob;
 	int w = r.right - r.left, h = r.bottom - r.top;
 	wchar_t buf[160];
 
@@ -179,9 +165,7 @@ void drawButton(const DRAWITEMSTRUCT* d)
 	accButton(d->hwndItem, c);
 
 	/* drawn off screen, then copied in one go: no flicker on hover */
-	mem = CreateCompatibleDC(dc);
-	bmp = CreateCompatibleBitmap(dc, w, h);
-	ob = SelectObject(mem, bmp);
+	mem = bufBegin(&bb, d->hDC, r.left, r.top, w, h);
 	SetRect(&r, 0, 0, w, h);
 	fillSolid(mem, &r, under);
 
@@ -197,9 +181,10 @@ void drawButton(const DRAWITEMSTRUCT* d)
 		drawText(mem, buf, -1, &t, fBold, dis ? PAL.hint : PAL.onAccent, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 		break;
 	}
-	case K_SEG:
+	case K_SEG:          /* the kind of password (main window) and the theme (Theme window) */
+	case K_THEMESEG:
 	{
-		int on = gOpt.mode == c->value;
+		int on = c->kind == K_SEG ? gOpt.mode == c->value : gTheme == c->value;
 		if (on) roundRect(mem, &r, SC(7), PAL.accent, CLR_NONE, 0);
 		else if (hot) roundRect(mem, &r, SC(7), PAL.accentSoft, CLR_NONE, 0);
 		if (focus) { RECT f = r; InflateRect(&f, -SC(2), -SC(2)); roundRect(mem, &f, SC(5), CLR_NONE, on ? PAL.onAccent : PAL.accent, (float)SC(1)); }
@@ -252,16 +237,6 @@ void drawButton(const DRAWITEMSTRUCT* d)
 		glyphChevron(mem, r.right - SC(16), h / 2, SC(9), PAL.hint);
 		break;
 	}
-	case K_THEMESEG:
-	{
-		int on = gTheme == c->value;
-		if (on) roundRect(mem, &r, SC(7), PAL.accent, CLR_NONE, 0);
-		else if (hot) roundRect(mem, &r, SC(7), PAL.accentSoft, CLR_NONE, 0);
-		if (focus) { RECT f = r; InflateRect(&f, -SC(2), -SC(2)); roundRect(mem, &f, SC(5), CLR_NONE, on ? PAL.onAccent : PAL.accent, (float)SC(1)); }
-		t = r;
-		drawText(mem, T(c->str), -1, &t, on ? fBold : fUi, on ? PAL.onAccent : PAL.text, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-		break;
-	}
 	case K_SWATCH:
 	{
 		/* a tile: the icon in that colour and its name; the chosen one is ringed */
@@ -293,12 +268,11 @@ void drawButton(const DRAWITEMSTRUCT* d)
 	}
 	}
 
-	BitBlt(dc, d->rcItem.left, d->rcItem.top, w, h, mem, 0, 0, SRCCOPY);
-	SelectObject(mem, ob);
-	DeleteObject(bmp);
-	DeleteDC(mem);
+	bufEnd(&bb);
 }
 
+/* The subclass of every owner-drawn button: hover tracking, the hand cursor, and double
+ * clicks fed back as single ones. It frees the button's Ctl when the button goes. */
 static LRESULT CALLBACK ctlProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR ref)
 {
 	Ctl* c = ctlOf(hwnd);
@@ -346,6 +320,31 @@ HWND mkButton(HWND parent, int id, int kind, int str, int* bind, int value, int 
 	SetWindowSubclass(b, ctlProc, 1, 0);
 	SendMessageW(b, WM_SETFONT, (WPARAM)fUi, FALSE);
 	return b;
+}
+
+/* The default push button of a window (Generate, OK): pressed by Enter, in the bold font. */
+HWND mkDefaultButton(HWND parent, int id, int str)
+{
+	HWND b = mkButton(parent, id, K_PRIMARY, str, NULL, 0, G_NONE);
+
+	SetWindowLongPtrW(b, GWL_STYLE, GetWindowLongPtrW(b, GWL_STYLE) | BS_DEFPUSHBUTTON);
+	SendMessageW(b, WM_SETFONT, (WPARAM)fBold, FALSE);
+	return b;
+}
+
+/* Registers a window class of this program. A second call for the same class fails quietly,
+ * which is harmless: the class is already there. */
+void registerClass(const wchar_t* name, WNDPROC proc, UINT style)
+{
+	WNDCLASSW wc;
+
+	ZeroMemory(&wc, sizeof(wc));
+	wc.style = style;
+	wc.lpfnWndProc = proc;
+	wc.hInstance = gInst;
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc.lpszClassName = name;
+	RegisterClassW(&wc);
 }
 
 /* ------------------------------------------------------------------ the slider */
@@ -458,15 +457,13 @@ LRESULT CALLBACK sliderProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		HDC dc = BeginPaint(hwnd, &ps), mem = CreateCompatibleDC(dc);
+		BackBuf bb;
+		HDC dc = BeginPaint(hwnd, &ps), mem;
 		RECT r, tr;
-		HBITMAP bmp;
-		HGDIOBJ ob;
 		int x, cy, th = SC(4), kr;
 
 		GetClientRect(hwnd, &r);
-		bmp = CreateCompatibleBitmap(dc, r.right, r.bottom);
-		ob = SelectObject(mem, bmp);
+		mem = bufBegin(&bb, dc, 0, 0, r.right, r.bottom);
 		fillSolid(mem, &r, PAL.card);
 		if (s)
 		{
@@ -481,10 +478,7 @@ LRESULT CALLBACK sliderProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			circle(mem, (float)x, (float)cy, (float)kr, PAL.accent, CLR_NONE, 0);
 			circle(mem, (float)x, (float)cy, (float)(kr - SC(3)), gDark ? PAL.card : RGB(255, 255, 255), CLR_NONE, 0);
 		}
-		BitBlt(dc, 0, 0, r.right, r.bottom, mem, 0, 0, SRCCOPY);
-		SelectObject(mem, ob);
-		DeleteObject(bmp);
-		DeleteDC(mem);
+		bufEnd(&bb);
 		EndPaint(hwnd, &ps);
 		return 0;
 	}
@@ -514,7 +508,7 @@ void measureMenuItem(MEASUREITEMSTRUCT* mi)
 
 	t = T(MENU_ID(mi->itemData));
 	tab = wcschr(t, L'\t');
-	w = textWidth(fUi, t, tab ? (int)(tab - t) : (int)wcslen(t));
+	w = textWidth(fUi, t, headLen(t));
 
 	if (MENU_ISBAR(mi->itemData))
 	{
@@ -588,6 +582,7 @@ void drawMenuItem(const DRAWITEMSTRUCT* d)
 	}
 }
 
+/* An owner-drawn item: its string id travels as the item data (see drawMenuItem). */
 static void addItem(HMENU m, UINT id, int str, int checked)
 {
 	AppendMenuW(m, MF_OWNERDRAW | (checked ? MF_CHECKED : 0), id, (LPCWSTR)(ULONG_PTR)str);
@@ -595,21 +590,21 @@ static void addItem(HMENU m, UINT id, int str, int checked)
 
 static void addSep(HMENU m) { AppendMenuW(m, MF_OWNERDRAW | MF_SEPARATOR, 0, (LPCWSTR)MENU_SEP); }
 
+/* The background of a menu and its submenus, in the theme's menu colour. The brush comes from
+ * the cache (draw.c): opening a drop-down list no longer deletes the brush the menu bar still
+ * paints with. */
 static void setMenuBrush(HMENU m)
 {
 	MENUINFO mi;
-	static HBRUSH br = NULL;
-	HBRUSH old = br;
 
-	br = CreateSolidBrush(PAL.menuBg);
 	ZeroMemory(&mi, sizeof(mi));
 	mi.cbSize = sizeof(mi);
 	mi.fMask = MIM_BACKGROUND | MIM_APPLYTOSUBMENUS;
-	mi.hbrBack = br;
+	mi.hbrBack = solidBrush(PAL.menuBg);
 	SetMenuInfo(m, &mi);
-	if (old) DeleteObject(old);
 }
 
+/* The three kinds of password and the profiles: the Passwords menu and the Profile button. */
 static void fillPresetMenu(HMENU m)
 {
 	int i, cur = currentPreset();
@@ -621,6 +616,8 @@ static void fillPresetMenu(HMENU m)
 	for (i = 0; i < P_COUNT; i++) addItem(m, IDM_PRESET_0 + i, PRESET_STR[i], cur == i);
 }
 
+/* The menu bar, made again whenever a check mark, the language, the theme or the scale
+ * changes. The old bar is destroyed once the new one is in place. */
 void buildMenu(HWND hwnd)
 {
 	HMENU file = CreatePopupMenu(), kind = CreatePopupMenu(), view = CreatePopupMenu();

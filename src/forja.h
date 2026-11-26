@@ -205,7 +205,6 @@ static inline int minInt(int a, int b) { return a < b ? a : b; }
 
 /* theme.c: the palette */
 COLORREF mix(COLORREF a, COLORREF b, double t);
-double luminance(COLORREF c);
 void makePalette(void);
 
 /* settings.c */
@@ -275,6 +274,7 @@ void effectiveOptions(PwOptions* o);
 int currentPreset(void);
 void setStatus(int kind, const wchar_t* text);
 void wipePasswords(void);
+int passwordText(int row, wchar_t* out, int cap);
 void sayGenerated(void);
 void setMode(int mode);
 
@@ -282,6 +282,7 @@ void setMode(int mode);
 void applyTheme(HWND hwnd);
 void loadLayer(void);
 HICON tintedIconFor(int accent, int size);
+void setWindowIcons(HWND h);
 void makeIcons(void);
 void refreshTheme(void);
 void makeFonts(void);
@@ -290,6 +291,10 @@ int windowDpi(HWND h);
 void applyDpi(int dpi, const RECT* rect);
 
 /* draw.c */
+typedef struct { HDC dst, mem; HBITMAP bmp; HGDIOBJ old; int x, y, w, h; } BackBuf;
+HDC bufBegin(BackBuf* b, HDC dst, int x, int y, int w, int h);
+void bufEnd(BackBuf* b);
+HBRUSH solidBrush(COLORREF c);
 DWORD argb(COLORREF c, int alpha);
 GpGraphics* gfx(HDC dc);
 void roundRect(HDC dc, const RECT* r, int radius, COLORREF fill, COLORREF line, float width);
@@ -298,6 +303,7 @@ void fillSolid(HDC dc, const RECT* r, COLORREF c);
 void drawText(HDC dc, const wchar_t* s, int n, RECT* r, HFONT f, COLORREF c, UINT flags);
 int textWidth(HFONT f, const wchar_t* s, int n);
 int headLen(const wchar_t* s);
+void headCopy(wchar_t* buf, int cap, const wchar_t* s);
 void glyphCopy(HDC dc, int x, int y, int s, COLORREF ink, COLORREF fill);
 void glyphCheck(HDC dc, int x, int y, int s, COLORREF ink, float w);
 void glyphSave(HDC dc, int x, int y, int s, COLORREF ink);
@@ -305,6 +311,7 @@ void glyphChevron(HDC dc, int cx, int cy, int s, COLORREF ink);
 void glyphPlusMinus(HDC dc, int cx, int cy, int s, COLORREF ink, int plus);
 
 /* clipboard.c */
+HGLOBAL globalCopy(const void* data, size_t bytes);
 void putDwordFormat(const wchar_t* name, DWORD value);
 int openClipboardRetry(void);
 int putClipboard(const wchar_t* text);
@@ -325,6 +332,7 @@ void saveAs(HWND hwnd);
 void allTips(UINT msg);
 void drawRow(const DRAWITEMSTRUCT* d);
 void buildControls(void);
+void setNumberText(HWND h, int v);
 void syncControls(void);
 int layoutTop(int W, int y0, int bandH, int listY);
 void layout(void);
@@ -334,7 +342,6 @@ void paintMain(HDC dc);
 
 /* access.c */
 void accSetName(HWND h, const wchar_t* name);
-void accSetDescription(HWND h, const wchar_t* text);
 void accSetValue(HWND h, const wchar_t* value);
 void accSetRole(HWND h, int role);
 int  accStateOf(HWND h, int checked);
@@ -348,6 +355,8 @@ void accNameMenu(HMENU m);
 Ctl* ctlOf(HWND h);
 void drawButton(const DRAWITEMSTRUCT* d);
 HWND mkButton(HWND parent, int id, int kind, int str, int* bind, int value, int glyph);
+HWND mkDefaultButton(HWND parent, int id, int str);
+void registerClass(const wchar_t* name, WNDPROC proc, UINT style);
 LRESULT CALLBACK sliderProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 void measureMenuItem(MEASUREITEMSTRUCT* mi);
 void drawMenuItem(const DRAWITEMSTRUCT* d);
@@ -376,7 +385,7 @@ int writeEntropy(const wchar_t* path, const PwOptions* o);
 int saveShot(HWND w, const wchar_t* path);
 void pump(DWORD ms);
 const wchar_t* widePathArg(const wchar_t* key);
-int parseOptions(PwOptions* o, int* noRepeat, char* exclude, int* count, int* preset);
+void parseOptions(PwOptions* o, int* noRepeat, char* exclude, int* count, int* preset);
 int parseDuration(const char* s);
 
 /* selftest.c */
