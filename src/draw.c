@@ -38,8 +38,9 @@ void bufEnd(BackBuf* b)
 
 /* A solid brush of colour c, made once and kept for the life of the program. Brushes handed
  * to Windows (WM_CTLCOLOR* replies, menu backgrounds) may still be in use after the call that
- * gave them, so they are never deleted. Only a few colours ever ask for one (the field, card
- * and menu colours of the two themes); should more come, the oldest slot is reused. */
+ * gave them, so they are not deleted while there is room. Only a few colours ever ask for one
+ * (the field, card and menu colours of the two themes, six in all); only past 16 colours
+ * would the oldest slot be reused and its brush deleted. */
 HBRUSH solidBrush(COLORREF c)
 {
 	static struct { COLORREF c; HBRUSH b; } cache[16];

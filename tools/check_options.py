@@ -9,14 +9,17 @@ SPDX-License-Identifier: GPL-2.0-only
 
 For each case it asks the program for passwords (/out) and checks every one against the
 rules in Python: alphabet, required kinds, exclusions, no repeated neighbours, first letter,
-PIN runs, passphrase words from the EFF list. Then it asks for the entropy (/entropy) and
-compares it with a count made here by brute force or inclusion-exclusion. The checker is
+PIN runs, passphrases read back into EFF list words in exactly one way. Then it asks for the
+entropy (/entropy) and compares it with a count made here by brute force or
+inclusion-exclusion; for passphrases, after proving (Sardinas-Patterson) that no two draws
+can give the same text with that separator, words with a hyphen of their own included. The checker is
 calibrated first: spoiled passwords and a wrong entropy must be caught.
 Exit 0 = all good.
 """
 
 import itertools
 import math
+import shutil
 import string
 import subprocess
 import sys
@@ -28,7 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WORDS = {line.split("\t")[1] for line in (ROOT / "assets" / "eff_large_wordlist.txt").read_text("ascii").splitlines() if line}
 SYM = {"basic": "!@#$%&*+-=?", "all": "".join(c for c in map(chr, range(33, 127)) if not c.isalnum()), "min": "-_."}
 AMB = "0O1lI|`'\""
-TMP = Path(tempfile.mkdtemp(prefix="rpg_opt_"))
+TMP = Path(tempfile.mkdtemp(prefix="forja_opt_"))     # removed at the end
 fails = 0
 
 
@@ -76,40 +79,90 @@ def pin_ok(pw, c):
     return None
 
 
+SEPS = {"hyphen": "-", "space": " ", "dot": ".", "underscore": "_", "none": "", "digit": None}
+MAXWORD = max(map(len, WORDS))
+
+
+def parses(pw, c, words=None):
+    """In how many ways pw splits into c["words"] list words in the program's format: a word
+    (capital first letter if capitals are on), the added digit after one of them, and the
+    separator between them (a random digit for "digit"). 1 = the passphrase is read back in
+    one way only; 0 = not a passphrase of these options; more = two draws gave this text."""
+    words = WORDS if words is None else words
+    n, sep, cap, num = c["words"], SEPS[c.get("sep", "hyphen")], c.get("cap", True), c.get("number", True)
+    memo = {}
+
+    def go(i, k, used):
+        if k == n:
+            return int(i == len(pw) and used == num)
+        key = (i, k, used)
+        if key in memo:
+            return memo[key]
+        total = 0
+        for L in range(1, MAXWORD + 1):
+            w = pw[i:i + L]
+            if len(w) < L:
+                break
+            core = (w[0].lower() + w[1:]) if cap and w[0].isupper() else w
+            if core not in words or (cap and not w[0].isupper()):
+                continue
+            j = i + L
+            for d in ((0, 1) if num and not used else (0,)):
+                jj = j + d
+                if d and not (jj <= len(pw) and pw[j].isdigit()):
+                    continue
+                if k + 1 == n:
+                    total += go(jj, k + 1, used or d)
+                elif sep is None:
+                    if jj < len(pw) and pw[jj].isdigit():
+                        total += go(jj + 1, k + 1, used or d)
+                elif pw.startswith(sep, jj):
+                    total += go(jj + len(sep), k + 1, used or d)
+        memo[key] = total
+        return total
+
+    return go(0, 0, False)
+
+
 def words_ok(pw, c):
-    sep = {"hyphen": "-", "space": " ", "dot": ".", "underscore": "_"}.get(c.get("sep", "hyphen"))
-    if sep is None:
-        return None                       # no separator / digits: only the count of letters is checked below
-    parts = pw.split(sep) if sep != "-" else None
-    if sep == "-":
-        # words may contain hyphens themselves (t-shirt): greedy match from the left
-        parts, rest = [], pw
-        while rest:
-            for n in range(len(rest), 0, -1):
-                head = rest[:n]
-                core = head.rstrip("0123456789").lower()
-                if core in WORDS and (n == len(rest) or rest[n] == "-"):
-                    parts.append(head)
-                    rest = rest[n + 1:]
-                    break
-            else:
-                return "not made of list words"
-    if len(parts) != c["words"]:
-        return f"{len(parts)} words"
-    digits = sum(ch.isdigit() for ch in pw)
-    if digits != (1 if c.get("number", True) else 0):
-        return "wrong number of digits"
-    for p in parts:
-        core = p.rstrip("0123456789")
-        if core.lower() not in WORDS:
-            return "not a list word"
-        if c.get("cap", True) and not core[0].isupper():
-            return "no capital"
-    return None
+    k = parses(pw, c)
+    return None if k == 1 else "not made of list words in this format" if k == 0 else f"read back in {k} ways"
+
+
+def uniquely_decodable(code):
+    """Sardinas-Patterson: True when no string is a concatenation of these code words in two
+    different ways. Used on the list (no separator) and on word+separator."""
+    code = set(code)
+    by_prefix = {}
+    for w in code:
+        for i in range(1, len(w)):
+            by_prefix.setdefault(w[:i], []).append(w)
+    todo = {w[i:] for w in code for i in range(1, len(w)) if w[:i] in code}
+    seen = set()
+    while todo:
+        x = todo.pop()
+        if x in code:
+            return False
+        if x in seen:
+            continue
+        seen.add(x)
+        todo |= {w[len(x):] for w in by_prefix.get(x, [])}
+        todo |= {x[i:] for i in range(1, len(x)) if x[:i] in code}
+    return True
+
+
+def words_decodable(c):
+    """Whether no two draws can give the same passphrase. Capitals only mark where words
+    start, and the added digit and random-digit separators are not letters, so the lowercase
+    words joined by the separator (nothing for "none" and "digit") decide it."""
+    sep = SEPS[c.get("sep", "hyphen")] or ""
+    return uniquely_decodable([w + sep for w in WORDS])
 
 
 def entropy_expected(c):
     if c["mode"] == "words":
+        if not words_decodable(c):
+            return float("nan")           # two draws can give one text: n x 12.9 bits would overstate it
         bits = c["words"] * math.log2(7776)
         if c.get("sep") == "digit":
             bits += (c["words"] - 1) * math.log2(10)
@@ -176,7 +229,7 @@ def check_case(c, count=3000):
     run(a, f"/entropy:{ent}")
     got = float(ent.read_text().split()[0])
     want = entropy_expected(c)
-    ok = not bad and len(lines) == count and abs(got - want) < 1e-4
+    ok = not bad and len(lines) == count and abs(got - want) < 1e-4      # a nan (not decodable) never passes
     fails += not ok
     print("ok  " if ok else "BAD ", " ".join(a), f"| {len(lines)} passwords, entropy {got:.3f} (expected {want:.3f})",
           f"| first problem: {bad[0]}" if bad else "")
@@ -191,6 +244,14 @@ caught = [chars_ok("aB3$efgh", cal) is None,          # a correct one passes
           pin_ok("5123", {"mode": "pin", "len": 4}) is not None,
           words_ok("Copper-Showroom-Wrecking7-Salute-Knoll-Preteen", {"mode": "words", "words": 6}) is None,
           words_ok("Copper-Showroom-Wreckinx7-Salute-Knoll-Preteen", {"mode": "words", "words": 6}) is not None,
+          words_ok("Copper-Showroom-Wrecking7-Salute-Knoll", {"mode": "words", "words": 6}) is not None,
+          words_ok("coppershowroomwrecking", {"mode": "words", "words": 3, "sep": "none", "cap": False, "number": False}) is None,
+          words_ok("Copper4Showroom51Wrecking", {"mode": "words", "words": 3, "sep": "digit"}) is None,
+          words_ok("t-shirt-drop-down-yo-yo", {"mode": "words", "words": 3, "cap": False, "number": False}) is None,
+          parses("abcd", {"words": 2, "sep": "none", "cap": False, "number": False}, {"ab", "abc", "cd", "d"}) == 2,
+          not uniquely_decodable(["ab", "abc", "cd", "d"]),         # abcd = ab+cd = abc+d
+          not uniquely_decodable([w + "-" for w in ("a-b", "a", "b-c", "c")]),   # a-b-c- two ways
+          uniquely_decodable(["ab", "cd", "abd"]),
           abs(entropy_expected({"mode": "chars", "len": 4, "classes": "d", "avoid": False}) - math.log2(10 ** 4)) < 1e-9]
 print("calibration:", "ok" if all(caught) else f"BAD {caught}")
 fails += not all(caught)
@@ -210,6 +271,13 @@ for c in [
     {"mode": "words", "words": 6},
     {"mode": "words", "words": 4, "sep": "space", "cap": False, "number": False},
     {"mode": "words", "words": 5, "sep": "dot"},
+    # words with a hyphen of their own (drop-down, t-shirt, yo-yo, felt-tip), no capitals to
+    # mark where a word starts: the list being uniquely decodable is what keeps the entropy exact
+    {"mode": "words", "words": 3, "sep": "none", "cap": False, "number": False},
+    {"mode": "words", "words": 4, "sep": "hyphen", "cap": False, "number": False},
+    {"mode": "words", "words": 3, "sep": "underscore", "cap": False},
+    {"mode": "words", "words": 4, "sep": "digit"},
+    {"mode": "words", "words": 3, "sep": "none"},
 ]:
     check_case(c)
 
@@ -285,6 +353,7 @@ check_uniform({"mode": "chars", "len": 5, "classes": "ld", "exclude": "cdefghijk
 check_uniform({"mode": "chars", "len": 5, "classes": "ld", "exclude": "cdefghijklmnopqrstuvwxyz0145678",
                "avoid": False}, 100000)
 
+shutil.rmtree(TMP, ignore_errors=True)
 print()
 print("ALL OPTION CHECKS PASSED" if not fails else f"FAILED: {fails}")
 sys.exit(1 if fails else 0)

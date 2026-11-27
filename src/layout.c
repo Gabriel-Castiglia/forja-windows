@@ -18,17 +18,21 @@ static LRESULT CALLBACK statusProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 
 /* Guessing time for an attacker who has the file and tries 100 billion passwords a second
  * (a rack of GPUs against a fast hash); on average half the space is searched. */
-static int guessTimeString(double bits)
+int guessTimeString(double bits)
 {
 	double secs = pow(2.0, bits - 1) / 1e11, year = 3.156e7;
 
 	if (secs < 1)            return S_TIME_INSTANT;
+	if (secs < 60)           return S_TIME_SECONDS;
 	if (secs < 3600)         return S_TIME_MINUTES;
 	if (secs < 86400)        return S_TIME_HOURS;
 	if (secs < year)         return S_TIME_DAYS;
 	if (secs < 100 * year)   return S_TIME_YEARS;
-	if (secs < 1e6 * year)   return S_TIME_CENTURIES;
-	if (secs < 1.4e10 * year)return S_TIME_MILLIONS;
+	if (secs < 1e3 * year)   return S_TIME_CENTURIES;
+	if (secs < 1e6 * year)   return S_TIME_THOUSANDS;
+	if (secs < 1e9 * year)   return S_TIME_MILLIONS;
+	if (secs < 1e12 * year)  return S_TIME_BILLIONS;   /* the universe is 1.4e10 years old */
+	if (secs < 1e15 * year)  return S_TIME_TRILLIONS;
 	return S_TIME_FOREVER;
 }
 

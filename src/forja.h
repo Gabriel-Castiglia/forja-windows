@@ -329,6 +329,7 @@ void writePasswords(const wchar_t* path, int* ok);
 void saveAs(HWND hwnd);
 
 /* layout.c */
+int guessTimeString(double bits);    /* S_TIME_* for an attacker trying 1e11 a second */
 void allTips(UINT msg);
 void drawRow(const DRAWITEMSTRUCT* d);
 void buildControls(void);

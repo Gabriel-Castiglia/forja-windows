@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $exe  = Join-Path $root 'build\forja.exe'
 $chk  = Join-Path $PSScriptRoot 'check_passwords.py'
-$tmp  = Join-Path ([IO.Path]::GetTempPath()) ('rpg_checks_' + [guid]::NewGuid().ToString('N'))
+$tmp  = Join-Path ([IO.Path]::GetTempPath()) ('forja_checks_' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $tmp | Out-Null
 $fail = 0
 

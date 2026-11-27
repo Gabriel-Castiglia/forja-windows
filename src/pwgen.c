@@ -257,7 +257,13 @@ static double pinEntropy(const PwOptions* o)
 }
 
 /* Passphrase: every word, every random-digit separator and the added digit (its value and
- * the word it follows) are independent, so their bits simply add up. */
+ * the word it follows) are independent, so their bits simply add up. That counts different
+ * passphrases, not just different draws, because no two draws give the same text: the EFF
+ * list is prefix-free (no word starts with another word, nor with another word and a hyphen,
+ * so drop-down, t-shirt, yo-yo and felt-tip cannot be read as two words), and the words have
+ * no digits, spaces, dots or underscores. Every separator, "none" included, and capitals or
+ * not, therefore splits a passphrase back into its draw in one way only;
+ * tools/check_options.py proves it for the list (Sardinas-Patterson) and counts the parses. */
 static double wordsEntropy(const PwOptions* o)
 {
 	int n = clampInt(o->words, PW_MIN_WORDS, PW_MAX_WORDS);

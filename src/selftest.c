@@ -343,6 +343,20 @@ int selfTest(const wchar_t* logPath)
 	/* 5. the update's pure functions */
 	gTestFails += upd_selftest(gTestLog);
 
+	/* 6. the guessing time: every step of the scale, and every text of it in every language */
+	{
+		static const struct { double bits; int id; } T6[] = {
+			{ 30, S_TIME_INSTANT }, { 40, S_TIME_SECONDS }, { 45, S_TIME_MINUTES }, { 52, S_TIME_HOURS },
+			{ 60, S_TIME_DAYS }, { 65, S_TIME_YEARS }, { 72, S_TIME_CENTURIES }, { 75, S_TIME_THOUSANDS },
+			{ 85, S_TIME_MILLIONS }, { 95, S_TIME_BILLIONS }, { 105, S_TIME_TRILLIONS }, { 122, S_TIME_FOREVER } };
+		int k, l, okTime = 1, okText = 1;
+		for (k = 0; k < (int)(sizeof(T6) / sizeof(T6[0])); k++) okTime &= guessTimeString(T6[k].bits) == T6[k].id;
+		for (l = 0; l < LANG_COUNT; l++)
+			for (k = S_TIME_INSTANT; k <= S_TIME_FOREVER; k++) okText &= STR[l][k] && STR[l][k][0];
+		testCheck(okTime, "strength: the guessing time goes from seconds up to trillions of years");
+		testCheck(okText, "strength: every guessing time has a text in English, Japanese and Spanish");
+	}
+
 	DeleteFileW(gIni);
 	RemoveDirectoryW(dir);
 	testCheck(GetFileAttributesW(dir) == INVALID_FILE_ATTRIBUTES, "the throw-away settings folder is gone");

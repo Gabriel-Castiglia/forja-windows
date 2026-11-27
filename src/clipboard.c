@@ -107,14 +107,16 @@ static int openClipboardIsOurs(void)
 }
 
 /* Something has changed the clipboard since our copy: is it still exactly our text (put
- * back by a clipboard tool, say)? If so it stays ours, under its new sequence number. */
+ * back by a clipboard tool, say)? If so it stays ours, under its new sequence number.
+ * 1 = ours, 0 = not ours, -1 = unknown: another program holds the clipboard open right now. */
 static int clipboardStillOurs(void)
 {
 	int ours;
 
 	if (!gClipHave) return 0;
 	if (GetClipboardSequenceNumber() == gClipSeq) return 1;
-	if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !openClipboardRetry()) return 0;
+	if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return 0;
+	if (!openClipboardRetry()) return -1;
 	ours = openClipboardIsOurs();
 	if (ours) gClipSeq = GetClipboardSequenceNumber();
 	CloseClipboard();
@@ -122,12 +124,14 @@ static int clipboardStillOurs(void)
 }
 
 /* Wipes the clipboard only if it still holds exactly what we put there. The check is made
- * with the clipboard open, so nobody can copy something in between. */
+ * with the clipboard open, so nobody can copy something in between. 1 = wiped, 0 = not ours
+ * (left alone), -1 = the clipboard could not be opened (another program holds it). */
 static int wipeOurClipboard(void)
 {
 	int ours;
 
-	if (!gClipHave || !openClipboardRetry()) return 0;
+	if (!gClipHave) return 0;
+	if (!openClipboardRetry()) return -1;
 	ours = openClipboardIsOurs();
 	if (ours) EmptyClipboard();
 	CloseClipboard();
@@ -171,7 +175,7 @@ void clearSwitched(void)
 		showCopied();
 		return;
 	}
-	if (gClipLeft > 0 || !clipboardStillOurs()) return;
+	if (gClipLeft > 0 || clipboardStillOurs() != 1) return;
 	armClipWipe();
 	showCopied();
 }
@@ -256,12 +260,26 @@ void copySelected(void)
 	copyRow((int)SendMessageW(hList, LB_GETCURSEL, 0, 0));
 }
 
-/* Once a second while a copy waits to be wiped. */
+/* Once a second while a copy waits to be wiped. A clipboard held open by another program
+ * at that moment is not taken for "something else was copied": the check (or the wipe) is
+ * tried again on the next tick, for up to CLIP_BUSY_TRIES ticks in a row. */
+#define CLIP_BUSY_TRIES 30
+
 void clipTick(void)
 {
-	if (!clipboardStillOurs())
+	static int busy = 0;
+	int ours = clipboardStillOurs();
+
+	if (ours < 0 && ++busy < CLIP_BUSY_TRIES)
 	{
-		/* something else was copied: it is not ours to wipe */
+		if (gClipLeft > 1) gClipLeft--;     /* the countdown goes on, but the wipe waits */
+		showCopied();
+		return;
+	}
+	if (ours <= 0)
+	{
+		/* something else was copied (or the clipboard stayed locked): not ours to wipe */
+		busy = 0;
 		KillTimer(hMain, TMR_CLIP);
 		gClipLeft = 0;
 		forgetClipboard();
@@ -269,13 +287,18 @@ void clipTick(void)
 		return;
 	}
 
-	if (--gClipLeft <= 0)
+	if (gClipLeft <= 1)
 	{
+		int wiped = wipeOurClipboard();
+		if (wiped < 0 && ++busy < CLIP_BUSY_TRIES) { gClipLeft = 1; showCopied(); return; }
+		busy = 0;
 		KillTimer(hMain, TMR_CLIP);
 		gClipLeft = 0;
-		if (wipeOurClipboard()) setStatus(ST_PLAIN, T(S_ST_CLEARED));
+		if (wiped > 0) setStatus(ST_PLAIN, T(S_ST_CLEARED));
 		else { forgetClipboard(); showCopied(); }
 		return;
 	}
+	busy = 0;
+	gClipLeft--;
 	showCopied();
 }

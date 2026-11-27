@@ -8,9 +8,10 @@ SPDX-License-Identifier: GPL-2.0-only
     python tools/check_passwords.py <file> <length> <avoid 1|0> [expected count]
 
 Checks every line: the length, one of each class, nothing outside the alphabet, no
-ambiguous character when avoid=1, no repeated password. Then a uniformity check: every
-character of the alphabet must appear, and none may be far from its expected share
-(chi-square over positions 4.., where all characters are drawn from the full pool).
+ambiguous character when avoid=1, no repeated password (from 12 characters up). Then, with
+at least 200,000 characters in the file, a uniformity check: every character of the alphabet
+must appear, and within each class (where every character is equally likely) none may be far
+from the others (chi-square, below its mean plus 5 standard deviations).
 Exit 0 = all good, 1 = something failed (printed).
 """
 

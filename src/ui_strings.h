@@ -44,8 +44,8 @@ enum {
 	S_GENERATE, S_TIP_GENERATE, S_TIP_COPYALL, S_TIP_SAVE,
 	S_STR_VWEAK, S_STR_WEAK, S_STR_FAIR, S_STR_STRONG, S_STR_VSTRONG, S_STR_PIN,
 	S_STRENGTH_BITS, S_STRENGTH_DETAIL, S_STRENGTH_DETAIL_W, S_TIP_STRENGTH,
-	S_TIME_INSTANT, S_TIME_MINUTES, S_TIME_HOURS, S_TIME_DAYS, S_TIME_YEARS,
-	S_TIME_CENTURIES, S_TIME_MILLIONS, S_TIME_FOREVER,
+	S_TIME_INSTANT, S_TIME_SECONDS, S_TIME_MINUTES, S_TIME_HOURS, S_TIME_DAYS, S_TIME_YEARS,
+	S_TIME_CENTURIES, S_TIME_THOUSANDS, S_TIME_MILLIONS, S_TIME_BILLIONS, S_TIME_TRILLIONS, S_TIME_FOREVER,
 	S_CLASS_LOWER, S_CLASS_UPPER, S_CLASS_DIGITS, S_CLASS_SYMBOLS,
 	S_ERR_NOCLASS, S_ERR_EMPTYCLASS, S_ERR_TOOSHORT, S_ERR_NODIGITS, S_ERR_TOOTIGHT,
 	S_ST_READY, S_ST_GENERATED, S_ST_GENERATED_ONE, S_ST_NOTHING, S_ST_COPIED, S_ST_COPIED_ALL,
@@ -192,13 +192,17 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"attacker with the file trying 100 billion a second.\n"
 	                     L"80 bits or more is very strong.",
 	[S_TIME_INSTANT]   = L"instantly",
+	[S_TIME_SECONDS]   = L"seconds",
 	[S_TIME_MINUTES]   = L"minutes",
 	[S_TIME_HOURS]     = L"hours",
 	[S_TIME_DAYS]      = L"days to months",
 	[S_TIME_YEARS]     = L"years",
 	[S_TIME_CENTURIES] = L"centuries",
+	[S_TIME_THOUSANDS] = L"thousands of years",
 	[S_TIME_MILLIONS]  = L"millions of years",
-	[S_TIME_FOREVER]   = L"longer than the age of the universe",
+	[S_TIME_BILLIONS]  = L"billions of years",
+	[S_TIME_TRILLIONS] = L"trillions of years",
+	[S_TIME_FOREVER]   = L"far longer than the age of the universe",
 	[S_CLASS_LOWER]    = L"the lowercase letters",
 	[S_CLASS_UPPER]    = L"the uppercase letters",
 	[S_CLASS_DIGITS]   = L"the digits",
@@ -494,13 +498,17 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"2^n 通りを意味します。推測時間は、ファイルを持つ攻撃者が\n"
 	                     L"毎秒1000億回試す場合の目安です。80ビット以上で非常に強力です。",
 	[S_TIME_INSTANT]   = L"一瞬",
+	[S_TIME_SECONDS]   = L"数秒",
 	[S_TIME_MINUTES]   = L"数分",
 	[S_TIME_HOURS]     = L"数時間",
 	[S_TIME_DAYS]      = L"数日〜数か月",
 	[S_TIME_YEARS]     = L"数年",
 	[S_TIME_CENTURIES] = L"数世紀",
-	[S_TIME_MILLIONS]  = L"数百万年",
-	[S_TIME_FOREVER]   = L"宇宙の年齢より長い",
+	[S_TIME_THOUSANDS] = L"数千年〜数十万年",
+	[S_TIME_MILLIONS]  = L"数百万年〜数億年",
+	[S_TIME_BILLIONS]  = L"数十億年〜数千億年",
+	[S_TIME_TRILLIONS] = L"数兆年〜数百兆年",
+	[S_TIME_FOREVER]   = L"宇宙の年齢をはるかに超える",
 	[S_CLASS_LOWER]    = L"小文字",
 	[S_CLASS_UPPER]    = L"大文字",
 	[S_CLASS_DIGITS]   = L"数字",
@@ -685,27 +693,27 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 {
 	[S_WINDOW_TITLE]   = L"Forja",
 	[S_APP_TITLE]      = L"Forja",
-	[S_APP_SUBTITLE]   = L"Contraseñas, frases y PIN fuertes \x2014 se hacen acá y no se guardan en ningún lado",
+	[S_APP_SUBTITLE]   = L"Contraseñas, frases y PIN fuertes \x2014 se crean aquí y no se guardan en ninguna parte",
 	[S_MODE_CHARS]     = L"Caracteres",
 	[S_MODE_WORDS]     = L"Frase",
 	[S_MODE_PIN]       = L"PIN",
 	[S_TIP_MODE_CHARS] = L"Caracteres al azar: lo más fuerte por carácter (Ctrl+1).",
-	[S_TIP_MODE_WORDS] = L"Palabras al azar: más largas, pero fáciles de recordar y tipear (Ctrl+2).",
+	[S_TIP_MODE_WORDS] = L"Palabras al azar: más largas, pero fáciles de recordar y escribir (Ctrl+2).",
 	[S_TIP_MODE_PIN]   = L"Solo dígitos, para cerraduras, tarjetas y teléfonos (Ctrl+3).",
 	[S_PROFILE_FMT]    = L"Perfil: %.*ls",
 	[S_TIP_PROFILE]    = L"Configuraciones listas para casos comunes: sitios que no\n"
-	                     L"aceptan símbolos, sitios con largo máximo corto, Wi-Fi, PIN\x2026",
+	                     L"aceptan símbolos, sitios con longitud máxima corta, Wi-Fi, PIN\x2026",
 	[S_PRESET_STANDARD]= L"Estándar\t20 caracteres, símbolos básicos",
 	[S_PRESET_MAX]     = L"Máxima\t32 caracteres, todos los símbolos",
 	[S_PRESET_NOSYM]   = L"Sin símbolos\tpara sitios que no los aceptan",
 	[S_PRESET_MINSYM]  = L"Símbolos mínimos\tsolo - _ .  para sitios estrictos",
 	[S_PRESET_SHORT]   = L"Corta\t12 caracteres, para un máximo bajo",
-	[S_PRESET_WIFI]    = L"Wi-Fi\tfácil de tipear en un teléfono o TV",
+	[S_PRESET_WIFI]    = L"Wi-Fi\tfácil de escribir en un teléfono o TV",
 	[S_PRESET_PHRASE]  = L"Frase\t6 palabras, fácil de recordar",
 	[S_PRESET_PIN]     = L"PIN\t6 dígitos, sin repetidos ni seguidos",
 	[S_PRESET_CUSTOM]  = L"Personalizado",
 	[S_CARD_LIST]      = L"Contraseñas",
-	[S_LBL_LENGTH]     = L"Largo",
+	[S_LBL_LENGTH]     = L"Longitud",
 	[S_LBL_WORDS]      = L"Palabras",
 	[S_LBL_DIGITS]     = L"Dígitos",
 	[S_LBL_COUNT]      = L"Cantidad",
@@ -718,15 +726,15 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_CHIP_UPPER]     = L"A\x2013Z",
 	[S_CHIP_DIGITS]    = L"0\x2013" L"9",
 	[S_CHIP_SYMBOLS]   = L"#$%",
-	[S_TIP_CHIPS]      = L"Qué tipos de carácter usar. Cada tipo encendido aparece\n"
+	[S_TIP_CHIPS]      = L"Qué tipos de carácter usar. Cada tipo activado aparece\n"
 	                     L"al menos una vez en cada contraseña.",
 	[S_SYM_BASIC]      = L"Básicos\t! @ # $ % & * + - = ?",
 	[S_SYM_ALL]        = L"Los 32\ttodos los símbolos imprimibles",
 	[S_SYM_MIN]        = L"Mínimos\t- _ .",
 	[S_SYM_CUSTOM]     = L"Los míos…\tescribirlos",
-	[S_TIP_SYMSET]     = L"Qué símbolos. Los básicos se aceptan casi en todos lados;\n"
+	[S_TIP_SYMSET]     = L"Qué símbolos. Los básicos se aceptan casi en todas partes;\n"
 	                     L"los mínimos (- _ .) sirven para sitios estrictos; con «Los\n"
-	                     L"míos» escribís exactamente los que permite el sitio.",
+	                     L"míos» escribes exactamente los que permite el sitio.",
 	[S_SEP_HYPHEN]     = L"Guion\t-",
 	[S_SEP_SPACE]      = L"Espacio",
 	[S_SEP_DOT]        = L"Punto\t.",
@@ -740,29 +748,29 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_OPT_START]      = L"Empezar con letra",
 	[S_OPT_CAP]        = L"Mayúsculas",
 	[S_OPT_NUMBER]     = L"Agregar un dígito",
-	[S_OPT_NOSEQ]      = L"Sin seguidos tipo 123 o 987",
+	[S_OPT_NOSEQ]      = L"Sin series como 123 o 987",
 	[S_OPT_CLEAR]      = L"Borrar portapapeles a los",
-	[S_TIP_AMBIG]      = L"Deja afuera 0, O, 1, l e I (y | ` ' \" entre los símbolos).\n"
+	[S_TIP_AMBIG]      = L"Deja fuera 0, O, 1, l e I (y | ` ' \" entre los símbolos).\n"
 	                     L"Se parecen en muchas fuentes, así que una contraseña\n"
-	                     L"dictada o tipeada a mano falla menos.",
+	                     L"dictada o escrita a mano falla menos.",
 	[S_TIP_NOREPEAT]   = L"Nunca el mismo carácter dos veces seguidas (aa, 11).\n"
 	                     L"Algunos sitios y equipos no lo aceptan.",
 	[S_TIP_START]      = L"El primer carácter es siempre una letra.\n"
 	                     L"Algunos sitios y sistemas viejos lo exigen.",
 	[S_TIP_EXCLUDE]    = L"Caracteres que nunca deben aparecer, por ejemplo los que\n"
-	                     L"un sitio rechaza. Escribilos uno detrás del otro.",
+	                     L"un sitio rechaza. Escríbelos uno detrás de otro.",
 	[S_TIP_CUSTOM]     = L"Exactamente los símbolos a usar, por ejemplo la lista que\n"
-	                     L"el sitio dice aceptar. Letras y dígitos se ignoran acá.",
+	                     L"el sitio dice aceptar. Aquí se ignoran letras y dígitos.",
 	[S_TIP_CAP]        = L"Cada Palabra Empieza Con Mayúscula, para sitios que\n"
 	                     L"exigen mayúsculas.",
 	[S_TIP_NUMBER]     = L"Un dígito después de una de las palabras, para sitios\n"
 	                     L"que exigen un número.",
-	[S_TIP_NOSEQ]      = L"Ningún trío de dígitos que suba o baje de a uno,\n"
+	[S_TIP_NOSEQ]      = L"Ningún trío de dígitos que suba o baje de uno en uno,\n"
 	                     L"como 123 o 987: son los primeros que se prueban.",
 	[S_TIP_CLEAR]      = L"Una contraseña copiada se borra del portapapeles cuando\n"
 	                     L"pasa el tiempo elegido a la derecha (2 minutos si no lo\n"
-	                     L"cambiás) o al cerrar Forja, pero solo si el portapapeles\n"
-	                     L"sigue teniendo exactamente lo que puso Forja. Apagado,\n"
+	                     L"cambias) o al cerrar Forja, pero solo si el portapapeles\n"
+	                     L"sigue teniendo exactamente lo que puso Forja. Desactivado,\n"
 	                     L"lo copiado queda hasta que copies otra cosa. Las copias\n"
 	                     L"nunca van al historial (Win+V) ni al portapapeles en la nube.",
 	[S_CLR_10S]        = L"10 s",
@@ -774,7 +782,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_CLR_FMT_S]      = L"%d s",
 	[S_CLR_FMT_M]      = L"%d min",
 	[S_TIP_CLEARTIME]  = L"Cuánto tiempo queda en el portapapeles una contraseña copiada.\n"
-	                     L"Elegir un tiempo también enciende el borrado.",
+	                     L"Elegir un tiempo también activa el borrado.",
 	[S_WORDS_NOTE]     = L"Palabras de la lista EFF de 7776 palabras en inglés: cada una suma 12,9 bits.",
 	[S_PIN_NOTE]       = L"Un PIN solo es seguro donde los intentos fallidos están limitados (tarjetas, teléfonos, cerraduras).",
 	[S_GENERATE]       = L"Generar",
@@ -796,35 +804,39 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	                     L"con el archivo que prueba 100 mil millones por segundo.\n"
 	                     L"80 bits o más es muy fuerte.",
 	[S_TIME_INSTANT]   = L"al instante",
+	[S_TIME_SECONDS]   = L"segundos",
 	[S_TIME_MINUTES]   = L"minutos",
 	[S_TIME_HOURS]     = L"horas",
 	[S_TIME_DAYS]      = L"días a meses",
 	[S_TIME_YEARS]     = L"años",
 	[S_TIME_CENTURIES] = L"siglos",
+	[S_TIME_THOUSANDS] = L"miles de años",
 	[S_TIME_MILLIONS]  = L"millones de años",
-	[S_TIME_FOREVER]   = L"más que la edad del universo",
+	[S_TIME_BILLIONS]  = L"miles de millones de años",
+	[S_TIME_TRILLIONS] = L"billones de años",
+	[S_TIME_FOREVER]   = L"mucho más que la edad del universo",
 	[S_CLASS_LOWER]    = L"las minúsculas",
 	[S_CLASS_UPPER]    = L"las mayúsculas",
 	[S_CLASS_DIGITS]   = L"los dígitos",
 	[S_CLASS_SYMBOLS]  = L"los símbolos",
-	[S_ERR_NOCLASS]    = L"Encendé al menos un tipo de carácter.",
-	[S_ERR_EMPTYCLASS] = L"No queda nada de %ls: permití alguno o apagá ese tipo.",
-	[S_ERR_TOOSHORT]   = L"Ninguna contraseña puede cumplir todas estas reglas. Aflojá alguna.",
+	[S_ERR_NOCLASS]    = L"Activa al menos un tipo de carácter.",
+	[S_ERR_EMPTYCLASS] = L"No queda nada de %ls: permite alguno o desactiva ese tipo.",
+	[S_ERR_TOOSHORT]   = L"Ninguna contraseña puede cumplir todas estas reglas. Flexibiliza alguna.",
 	[S_ERR_NODIGITS]   = L"Están excluidos todos los dígitos.",
-	[S_ERR_TOOTIGHT]   = L"Estas reglas dejan tan pocas contraseñas que generar una tardaría demasiado. Aflojá alguna.",
+	[S_ERR_TOOTIGHT]   = L"Estas reglas dejan tan pocas contraseñas que generar una tardaría demasiado. Flexibiliza alguna.",
 	[S_ST_READY]       = L"Listo.",
 	[S_ST_GENERATED]   = L"%d contraseñas nuevas.",
 	[S_ST_GENERATED_ONE] = L"1 contraseña nueva.",
-	[S_ST_NOTHING]     = L"No hay contraseñas: mirá el mensaje arriba de la lista.",
+	[S_ST_NOTHING]     = L"No hay contraseñas: consulta el mensaje encima de la lista.",
 	[S_ST_COPIED]      = L"Contraseña %d copiada al portapapeles.",
 	[S_ST_COPIED_ALL]  = L"%d contraseñas copiadas al portapapeles.",
 	[S_ST_CLEAR_IN]    = L"  Se borra en %d s.",
 	[S_ST_CLEARED]     = L"Se borró el portapapeles.",
 	[S_ST_SAVED]       = L"Guardado: %ls",
 	[S_ST_SAVE_FAIL]   = L"No se pudo escribir el archivo.",
-	[S_ST_CLIP_FAIL]   = L"No se pudo abrir el portapapeles. Probá de nuevo.",
+	[S_ST_CLIP_FAIL]   = L"No se pudo abrir el portapapeles. Inténtalo de nuevo.",
 	[S_ST_RNG_FAIL]    = L"Falló el generador de números aleatorios de Windows. No se generó ninguna contraseña.",
-	[S_ST_TRIES_FAIL]   = L"Después de muchos intentos no salió ninguna contraseña que cumpla estas reglas. Aflojá alguna.",
+	[S_ST_TRIES_FAIL]   = L"Después de muchos intentos no salió ninguna contraseña que cumpla estas reglas. Flexibiliza alguna.",
 	[S_SAVE_FILTER]    = L"Archivos de texto (*.txt)\0*.txt\0Todos los archivos (*.*)\0*.*\0\0",
 	[S_SAVE_DEFNAME]   = L"contraseñas.txt",
 	[S_MENU_FILE]      = L"&Archivo",
@@ -870,12 +882,12 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_MENU_UPDATE]    = L"Buscar act&ualizaciones\x2026",
 	[S_MENU_UPDATE_AUTO] = L"Buscar actualizaciones &todos los días",
 	[S_UPD_UPTODATE]   = L"Forja %ls está actualizado.",
-	[S_UPD_AVAILABLE]  = L"Está disponible Forja %ls (tenés la %ls).\n¿Abrir la página de descarga?",
-	[S_UPD_PORTABLE]   = L"Está disponible Forja %ls (tenés la %ls).\n\nEsta copia es portable (no se "
+	[S_UPD_AVAILABLE]  = L"Está disponible Forja %ls (tienes la %ls).\n¿Abrir la página de descarga?",
+	[S_UPD_PORTABLE]   = L"Está disponible Forja %ls (tienes la %ls).\n\nEsta copia es portable (no se "
 	                     L"instaló con el instalador), así que no puede actualizarse sola. ¿Abrir la página de descarga?",
 	[S_UPD_ERROR]      = L"No se pudo buscar actualizaciones.\n%ls",
 	[S_UPD_ASK_HEAD]   = L"Está disponible Forja %ls",
-	[S_UPD_ASK]        = L"Tenés la %ls. La actualización se descarga e instala sola: el instalador se verifica "
+	[S_UPD_ASK]        = L"Tienes la %ls. La actualización se descarga e instala sola: el instalador se verifica "
 	                     L"contra las sumas SHA-256 de la versión publicada, firmadas por el autor, Forja se cierra, "
 	                     L"la versión nueva se instala con las mismas opciones y Forja vuelve a abrirse.",
 	[S_UPD_NOW]        = L"Actualizar ahora",
@@ -885,7 +897,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_UPD_DOWNLOADING]= L"Descargando Forja %ls\x2026 %ls",
 	[S_UPD_NOHASH]     = L"La versión publicada no trae la suma de verificación del instalador.",
 	[S_UPD_BADHASH]    = L"El instalador descargado no coincide con su suma de verificación; se borró.",
-	[S_UPD_BADSIG]     = L"La versión publicada no trae una firma válida del autor: no se instaló nada. Se puede bajar a mano desde su página.",
+	[S_UPD_BADSIG]     = L"La versión publicada no trae una firma válida del autor: no se instaló nada. Se puede descargar manualmente desde su página.",
 	[S_UPD_FAILED]     = L"No se pudo instalar la actualización.\n%ls",
 	[S_UPD_UPDATED]    = L"Forja se actualizó a la %ls.",
 	[S_UPD_NET]        = L"Falló la conexión con GitHub (error %lu).",
@@ -893,7 +905,7 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_FIRST_UPD_HEAD] = L"¿Buscar versiones nuevas automáticamente?",
 	[S_FIRST_UPD_BODY] = L"Forja puede preguntarle a GitHub una vez por día si hay una versión más nueva y ofrecértela cuando la haya. "
 	                     L"Solo se pregunta cuál es la última versión: no se envía nada de tus contraseñas ni de tu configuración. "
-	                     L"Lo podés cambiar cuando quieras en Ayuda → Buscar actualizaciones todos los días.",
+	                     L"Puedes cambiarlo cuando quieras en Ayuda → Buscar actualizaciones todos los días.",
 	[S_FIRST_UPD_YES]  = L"Buscar todos los días",
 	[S_FIRST_UPD_NO]   = L"No buscar",
 	[S_ACC_LIST]       = L"Contraseñas",
@@ -903,34 +915,34 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 	[S_HELP_BODY]      =
 		L"# Qué hace\n"
 		L"Genera contraseñas, frases de contraseña y PIN fuertes y al azar: para un zip, 7z o rar que se "
-		L"manda por email, una cuenta nueva, una red Wi-Fi o una cerradura. No guarda ni envía nada.\n"
+		L"envía por correo electrónico, una cuenta nueva, una red Wi-Fi o una cerradura. No guarda ni envía nada.\n"
 		L"# Cómo se usa\n"
-		L"\x2022 Elegí el tipo arriba: Caracteres, Frase o PIN (Ctrl+1, Ctrl+2, Ctrl+3).\n"
-		L"\x2022 O elegí un perfil listo con el botón Perfil (o el menú Contraseñas).\n"
-		L"\x2022 Ajustá las opciones: cada cambio genera un juego nuevo al instante. Generar (F5) hace otro.\n"
+		L"\x2022 Elige el tipo arriba: Caracteres, Frase o PIN (Ctrl+1, Ctrl+2, Ctrl+3).\n"
+		L"\x2022 O elige un perfil listo con el botón Perfil (o el menú Contraseñas).\n"
+		L"\x2022 Ajusta las opciones: cada cambio genera un juego nuevo al instante. Generar (F5) hace otro.\n"
 		L"\x2022 Para copiar una: clic en el ícono de copiar al final de su fila, doble clic en la fila, o "
-		L"seleccionala y apretá Enter o Ctrl+C. Ctrl+Mayús+C copia todas; Ctrl+S las guarda en un archivo de texto.\n"
+		L"selecciónala y pulsa Enter o Ctrl+C. Ctrl+Mayús+C copia todas; Ctrl+S las guarda en un archivo de texto.\n"
 		L"# Cuando un sitio no acepta algunos caracteres\n"
-		L"\x2022 No acepta símbolos: elegí el perfil «Sin símbolos», o apagá el botón #$%.\n"
-		L"\x2022 Acepta solo algunos símbolos: elegí Símbolos → Mínimos (- _ .), o «Los míos» y escribí "
+		L"\x2022 No acepta símbolos: elige el perfil «Sin símbolos» o desactiva el botón #$%.\n"
+		L"\x2022 Acepta solo algunos símbolos: elige Símbolos → Mínimos (- _ .), o «Los míos» y escribe "
 		L"exactamente los que lista el sitio.\n"
-		L"\x2022 Rechaza caracteres puntuales: escribilos en «Excluir».\n"
-		L"\x2022 Tiene un largo máximo: bajá el largo, o elegí el perfil «Corta» (12). Compensá una contraseña "
+		L"\x2022 Rechaza caracteres concretos: escríbelos en «Excluir».\n"
+		L"\x2022 Tiene una longitud máxima: reduce la longitud o elige el perfil «Corta» (12). Compensa una contraseña "
 		L"corta usando todos los tipos de carácter.\n"
-		L"\x2022 Exige empezar con letra, o no repetir caracteres seguidos: encendé «Empezar con letra» o "
+		L"\x2022 Exige empezar con letra, o no repetir caracteres seguidos: activa «Empezar con letra» o "
 		L"«Sin repetir seguidos».\n"
 		L"# Qué tipo elegir\n"
-		L"\x2022 Caracteres: lo más fuerte para su largo. Ideal cuando la contraseña se pega, no se tipea.\n"
+		L"\x2022 Caracteres: lo más fuerte para su longitud. Ideal cuando la contraseña se pega, no se escribe.\n"
 		L"\x2022 Frase: palabras al azar como Copper-Showroom-Wrecking7-Salute. Más larga, pero mucho más fácil de "
-		L"recordar, dictar o tipear en un teléfono. Seis palabras dan unos 80 bits.\n"
+		L"recordar, dictar o escribir en un teléfono. Seis palabras dan unos 80 bits.\n"
 		L"\x2022 PIN: solo dígitos. Seguro solo donde los intentos fallidos están limitados, como en tarjetas, "
 		L"teléfonos y cerraduras.\n"
 		L"# Cómo se hacen las contraseñas\n"
 		L"Cada carácter o palabra sale del generador criptográfico de números aleatorios de Windows "
 		L"(BCryptGenRandom). Cuando una contraseña no cumple alguna regla \x2014 falta un tipo de carácter, un "
-		L"carácter repetido seguido, una seguidilla como 123 \x2014 se descarta y se sortea de nuevo, nunca se "
-		L"parcha. Así, cualquier contraseña que cumpla las reglas es exactamente igual de probable que otra, "
-		L"y ninguna posición, tipo o patrón sale favorecido.\n"
+		L"carácter repetido seguido, una secuencia como 123 \x2014 se descarta y se sortea de nuevo, nunca se "
+		L"corrige. Así, cualquier contraseña que cumpla las reglas es exactamente igual de probable que otra, "
+		L"y no se favorece ninguna posición, tipo ni patrón.\n"
 		L"# Fuerza\n"
 		L"La entropía se cuenta exactamente: cuántas contraseñas distintas pueden salir con la configuración, "
 		L"con todas las reglas (n bits = 2^n posibilidades). Menos de 36 bits es muy débil, menos de 50 débil, "
@@ -939,19 +951,19 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"predeterminado (20 caracteres) son unos 122 bits.\n"
 		L"# Colores\n"
 		L"En la lista, los dígitos van en azul y los símbolos en ámbar, para releer o dictar más fácil. Lo que "
-		L"se copia es texto común. En Ver → Tema y color… elegís el tema (claro, oscuro o como Windows) y "
+		L"se copia es texto común. En Ver → Tema y color… eliges el tema (claro, oscuro o como Windows) y "
 		L"uno de doce colores, que también pinta el ícono; el negro es el de fábrica.\n"
 		L"# Portapapeles\n"
-		L"Con «Borrar portapapeles a los» encendido (viene así), una contraseña copiada se borra cuando pasa el "
-		L"tiempo elegido al lado \x2014 2 minutos, salvo que elijas 10 s, 30 s, 1, 5 o 10 minutos \x2014 o apenas "
+		L"Con «Borrar portapapeles a los» activado (viene así), una contraseña copiada se borra cuando pasa el "
+		L"tiempo elegido al lado \x2014 2 minutos, salvo que elijas 10 s, 30 s, 1, 5 o 10 minutos \x2014 o en cuanto "
 		L"se cierra el programa, lo que ocurra primero. Se borra solo si el portapapeles sigue teniendo "
-		L"exactamente lo que puso Forja: lo que hayas copiado después no se toca. Apagado, lo copiado queda "
+		L"exactamente lo que puso Forja: lo que hayas copiado después no se toca. Desactivado, lo copiado queda "
 		L"hasta que copies otra cosa. Las copias nunca van al historial del portapapeles de Windows (Win+V) ni "
 		L"a la nube.\n"
 		L"# Actualizaciones\n"
 		L"Ayuda \x2192 Buscar actualizaciones\x2026 le pregunta a GitHub si se publicó una versión nueva; con "
-		L"«Buscar actualizaciones todos los días» encendido, eso también se hace solo una vez por día. La "
-		L"primera vez que abrís Forja, te pregunta si lo querés. No se envía nada sobre vos ni sobre tus "
+		L"«Buscar actualizaciones todos los días» activado, eso también se hace solo una vez por día. La "
+		L"primera vez que abres Forja, te pregunta si lo quieres. No se envía nada sobre ti ni sobre tus "
 		L"contraseñas. Si hay una versión nueva, una sola pregunta: Actualizar ahora, Ver novedades o Más "
 		L"tarde. Actualizar ahora comprueba que la versión publicada lleve la firma del autor (sin ella no se "
 		L"instala nada), descarga el instalador, lo verifica contra las sumas SHA-256 de la versión publicada "
@@ -960,24 +972,24 @@ const wchar_t* const STR[LANG_COUNT][S_COUNT] = {
 		L"ofrece abrir la página de descarga.\n"
 		L"# Lectores de pantalla y escala\n"
 		L"El Narrador y los otros lectores de pantalla leen toda la ventana: cada control por su nombre, los "
-		L"interruptores y las fichas como casillas encendidas o apagadas, el deslizador con su valor, cada fila "
+		L"interruptores y las fichas como casillas activadas o desactivadas, el deslizador con su valor, cada fila "
 		L"de la lista como su contraseña, y los menús; la línea de estado se lee cada vez que cambia. Si la "
 		L"ventana pasa a una pantalla con otra escala, se vuelve a dibujar a esa escala, nítida.\n"
 		L"# Configuración\n"
-		L"Se guarda en %APPDATA%\\Forja\\forja.ini. Para usarlo portable, desde un pendrive o "
-		L"una carpeta compartida, poné un forja.ini vacío junto a forja.exe: entonces se usa ese.\n"
+		L"Se guarda en %APPDATA%\\Forja\\forja.ini. Para usarlo como portable, desde una memoria USB o "
+		L"una carpeta compartida, pon un forja.ini vacío junto a forja.exe: entonces se usa ese.\n"
 		L"# Buenas prácticas\n"
-		L"Mandá la contraseña por un canal distinto del archivo: el archivo por email y la contraseña en otro "
+		L"Envía la contraseña por un canal distinto del archivo: el archivo por correo electrónico y la contraseña en otro "
 		L"mensaje, un chat o una llamada. Al cerrar la ventana, las contraseñas desaparecen.",
 	[S_BTN_OK]         = L"Aceptar",
 	[S_ABOUT_TITLE]    = L"Acerca de",
 	[S_ABOUT_NAME]     = L"Forja",
-	[S_ABOUT_MEANING]  = L"El nombre: en la forja el metal toma forma a golpes de martillo sobre el yunque, como acá cada contraseña sale del puro azar. Hasta la versión 2.1 se llamaba Wyrmhold.",
+	[S_ABOUT_MEANING]  = L"El nombre: en la forja el metal toma forma a golpes de martillo sobre el yunque, como aquí cada contraseña sale del puro azar. Hasta la versión 2.1 se llamaba Wyrmhold.",
 	[S_ABOUT_VERSION]  = L"Versión %ls  \x00B7  %ls",
 	[S_ABOUT_BODY]     = L"Genera contraseñas, frases y PIN fuertes con el generador criptográfico de números "
 	                     L"aleatorios de Windows, de manera uniforme entre todas las contraseñas que cumplen las "
 	                     L"reglas elegidas. No guarda ni envía nada: las contraseñas existen solo en esta ventana "
-	                     L"hasta que las copiás o guardás.",
+	                     L"hasta que las copias o guardas.",
 	[S_ABOUT_AUTHOR]   = L"Autor: %ls",
 	[S_ABOUT_CREDITS]  = L"Palabras de las frases: la lista grande de EFF, de la Electronic Frontier Foundation, "
 	                     L"bajo CC BY 3.0 US (eff.org/dice). Ícono: un yunque y un martillo dibujados para Forja (2026), "

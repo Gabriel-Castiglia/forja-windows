@@ -15,9 +15,9 @@
 #define FORJA_VERSION_H
 
 #define WH_VER_MAJOR    3
-#define WH_VER_MINOR    1
-#define WH_VER_PATCH    2
-#define WH_VERSION_STR  "3.1.2"
+#define WH_VER_MINOR    2
+#define WH_VER_PATCH    0
+#define WH_VERSION_STR  "3.2.0"
 #define WH_DATE_STR     "2026-11-27"
 #define WH_REPO_STR     "github.com/Gabriel-Castiglia/forja-windows"
 

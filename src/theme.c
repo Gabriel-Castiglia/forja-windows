@@ -273,6 +273,23 @@ void setWindowIcons(HWND h)
 	SendMessageW(h, WM_SETICON, ICON_SMALL, (LPARAM)icSmall);
 }
 
+/* A system metric at the current scale (gDpi): GetSystemMetricsForDpi (Windows 10 1607 and
+ * later, looked up at run time); GetSystemMetrics, which answers at the main screen's
+ * scale, where it does not exist. */
+static int metricAtDpi(int index)
+{
+	typedef int (WINAPI *PGetSystemMetricsForDpi)(int, UINT);
+	static PGetSystemMetricsForDpi get = NULL;
+	static int tried = 0;
+
+	if (!tried)
+	{
+		tried = 1;
+		get = (PGetSystemMetricsForDpi)(void*)GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetSystemMetricsForDpi");
+	}
+	return get ? get(index, (UINT)gDpi) : GetSystemMetrics(index);
+}
+
 /* Makes every icon again in the current accent and scale. The old ones are destroyed only
  * after every window has been given the new ones. */
 void makeIcons(void)
@@ -281,8 +298,8 @@ void makeIcons(void)
 
 	icBand  = tintedIconFor(gAccent, SC(ICON_SZ));
 	icAbout = tintedIconFor(gAccent, SC(72));
-	icBig   = tintedIconFor(gAccent, GetSystemMetrics(SM_CXICON));
-	icSmall = tintedIconFor(gAccent, GetSystemMetrics(SM_CXSMICON));
+	icBig   = tintedIconFor(gAccent, metricAtDpi(SM_CXICON));
+	icSmall = tintedIconFor(gAccent, metricAtDpi(SM_CXSMICON));
 	setWindowIcons(hMain);
 	setWindowIcons(hHelpWnd);
 	setWindowIcons(hAboutWnd);

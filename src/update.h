@@ -54,14 +54,14 @@ DWORD upd_http_get(const wchar_t* url, const wchar_t* agent, const wchar_t* acce
 int upd_sha256(const void* data, size_t n, BYTE out[32]);
 int upd_sha256_file(const wchar_t* path, char out[65]);
 
+/* The same as upd_sha256_file through a handle already open (read from the start). */
+int upd_sha256_handle(HANDLE f, char out[65]);
+
 /* 1 when `sig` (the text of release.sig: base64 of r||s, 64 bytes) is a valid ECDSA P-256 / SHA-256
  * signature of exactly the n bytes of `data` by one of the author's two keys (the same two keys as
  * ReleaseSignature.cs of the author's other Windows apps: the PC's and the Mac's). An update is
  * downloaded only when its SHA256SUMS.txt passes this. */
 int upd_signature_valid(const void* data, size_t n, const char* sig);
-
-/* The same through a handle already open (read from the start). */
-int upd_sha256_handle(HANDLE f, char out[65]);
 
 /* 1 when this executable is the one the setup installed (its folder is the InstallLocation
  * the setup recorded), 0 for a portable copy, which cannot update itself. */

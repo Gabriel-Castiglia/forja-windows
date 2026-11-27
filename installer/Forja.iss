@@ -52,13 +52,13 @@ ja.Guide=Forja ユーザーガイド
 es.Guide=Guía de uso de Forja
 en.Tagline=Strong passwords, passphrases and PINs, made on this computer and stored nowhere.
 ja.Tagline=強力なパスワード・パスフレーズ・PIN を、このコンピューターで作り、どこにも保存しません。
-es.Tagline=Contraseñas, frases y PIN fuertes, hechos en esta computadora y sin guardarse en ningún lado.
+es.Tagline=Contraseñas, frases y PIN fuertes, creados en este equipo y sin guardarse en ninguna parte.
 en.RemoveSettings=Also delete Forja's settings (language, theme, last options)?
 ja.RemoveSettings=Forja の設定（言語・テーマ・最後のオプション）も削除しますか？
 es.RemoveSettings=¿Borrar también la configuración de Forja (idioma, tema, últimas opciones)?
 en.WyrmholdLeft=Wyrmhold, the former name of Forja, could not be uninstalled (code %1). Both are installed now: you can remove Wyrmhold from Settings > Apps.
 ja.WyrmholdLeft=Forja の旧名 Wyrmhold をアンインストールできませんでした（コード %1）。現在は両方がインストールされています。Wyrmhold は［設定］>［アプリ］から削除できます。
-es.WyrmholdLeft=No se pudo desinstalar Wyrmhold, el nombre anterior de Forja (código %1). Ahora están instalados los dos: podés quitar Wyrmhold desde Configuración > Aplicaciones.
+es.WyrmholdLeft=No se pudo desinstalar Wyrmhold, el nombre anterior de Forja (código %1). Ahora están instalados los dos: puedes quitar Wyrmhold desde Configuración > Aplicaciones.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -116,7 +116,7 @@ begin
   if CurStep = ssInstall then RemoveWyrmhold();
 end;
 
-// Started by Forja itself (the "updates" part of src/forja.c): /WHWAITPID=<pid> waits for
+// Started by Forja itself (the self-installing update, src/updui.c): /WHWAITPID=<pid> waits for
 // that process to finish closing before any file is replaced; /WHRELAUNCH=1 starts the program
 // again when the files are in place. A silent setup keeps the previous install folder, mode,
 // language and tasks (UsePrevious* default to yes).

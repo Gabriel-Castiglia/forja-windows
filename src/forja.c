@@ -32,7 +32,7 @@
       answered yes): one question, then the setup is
       downloaded (only when the release's SHA256SUMS.txt carries the author's signature,
       release.sig), checked against that SHA256SUMS.txt, run in silence, and the
-      program comes back (see "updates" below and update.c);
+      program comes back (see updui.c and update.c);
     - light, dark or follow-Windows theme and twelve accent colours (View -> Theme and
       colour), which also tint the icon;
     - English, Japanese and Spanish; Help, About and Theme windows;
@@ -65,7 +65,7 @@
                    /symbols:basic|all|min|custom:<chars>  /exclude:<chars>  /ambiguous
                    /norepeat  /startletter  /sep:hyphen|space|dot|underscore|none|digit
                    /nocap  /nonumber  /allowruns  /preset:N
-          window:  /theme:light|dark  /accent:N  /lang:en|jp|es  /open:help|about|theme
+          window:  /theme:system|light|dark  /accent:N  /lang:en|jp|es  /open:help|about|theme
                    /clearafter:N[s|m]|off
         forja.exe /selftest:<log>
 
@@ -79,9 +79,10 @@
       window as on a small screen. None of them writes the .ini.
       /clearafter sets how long a copy stays on the clipboard for this session only (seconds,
       or minutes with "m"; 0 or "off" keeps copies); the .ini keeps the window's own choice.
-      /selftest checks the clipboard wiping, its settings and the update's pure functions
-      with a throw-away .ini, writes the report to <log> and exits with the number of
-      failures; the user's clipboard is saved first and put back afterwards.
+      /selftest checks the clipboard wiping, its settings, saving a list, the update's
+      download folders and the update's pure functions with a throw-away .ini, writes the
+      report to <log> and exits with the number of failures; the user's clipboard is saved
+      first and put back afterwards (selftest.c).
 **/
 
 #define UI_STRINGS_TABLE           /* the string table is compiled here, once */
@@ -497,8 +498,9 @@ static void onCommand(HWND hwnd, int id, int code, HWND ctl)
 	if (id == IDM_THEMEDLG) { showTheme(hwnd); return; }
 	if (id >= IDM_SYM_0 && id <= IDM_SYM_0 + PW_SYM_CUSTOM)
 	{
+		/* picking a symbol set also switches the symbols on */
 		gOpt.symbolSet = id - IDM_SYM_0;
-		if (gOpt.symbolSet != PW_SYM_CUSTOM || gOpt.symbols == 0) gOpt.symbols = 1;
+		gOpt.symbols = 1;
 		layout();
 		RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
 		if (gOpt.symbolSet == PW_SYM_CUSTOM) SetFocus(hCustom);
@@ -513,12 +515,15 @@ static void onCommand(HWND hwnd, int id, int code, HWND ctl)
 	}
 	if (id >= IDM_CLR_0 && id < IDM_CLR_0 + CLEAR_CHOICE_N)
 	{
-		/* a time picked: clearing is on, and the choice is the window's own (saved) */
+		/* a time picked: clearing is on, and the choice is the window's own (saved). When this
+		 * switched clearing on, the copy already made starts its countdown, as with the switch. */
+		int wasOn = gClearClip;
 		gClearSecs = CLEAR_CHOICES[id - IDM_CLR_0];
 		gClearClip = 1;
 		gClearFromArg = 0;
 		InvalidateRect(hTgClear, NULL, FALSE);
 		InvalidateRect(hClearTime, NULL, FALSE);
+		if (!wasOn) clearSwitched();
 		return;
 	}
 }
@@ -724,7 +729,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	RECT want;
 	const char *outPath = NULL, *shotPath = NULL, *openWhat = NULL, *entPath = NULL;
 	const char *testPath = NULL, *clearArg = NULL;
-	int i, langArg = -1, ww, wh, wx, wy, rc = 0, updated = 0, shotDpi = 0, areaW = 0, areaH = 0, savedPos, designSize = 0;
+	int i, langArg = -1, themeArg = -1, accentArg = -1, ww, wh, wx, wy, rc = 0, updated = 0, shotDpi = 0, areaW = 0, areaH = 0, savedPos, designSize = 0;
 
 	(void)prev; (void)cmdLine;
 
@@ -741,9 +746,10 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 		else if (!_strnicmp(a, "entropy:", 8)) entPath = a + 8;
 		else if (!_strnicmp(a, "shot:", 5))    shotPath = a + 5;
 		else if (!_strnicmp(a, "open:", 5))    openWhat = a + 5;
-		else if (!_stricmp(a, "theme:dark"))   gTheme = 2;
-		else if (!_stricmp(a, "theme:light"))  gTheme = 1;
-		else if (!_strnicmp(a, "accent:", 7))  gAccent = clampInt(atoi(a + 7), 0, ACCENT_COUNT - 1);
+		else if (!_stricmp(a, "theme:dark"))   themeArg = 2;
+		else if (!_stricmp(a, "theme:light"))  themeArg = 1;
+		else if (!_stricmp(a, "theme:system") || !_stricmp(a, "theme:auto")) themeArg = 0;
+		else if (!_strnicmp(a, "accent:", 7))  accentArg = clampInt(atoi(a + 7), 0, ACCENT_COUNT - 1);
 		else if (!_stricmp(a, "lang:en"))      langArg = LANG_EN;
 		else if (!_stricmp(a, "lang:jp"))      langArg = LANG_JP;
 		else if (!_stricmp(a, "lang:es"))      langArg = LANG_ES;
@@ -781,12 +787,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdLine, int show)
 	setAppId();
 	readDpi();
 	if (shotPath && shotDpi >= 96 && shotDpi <= 480) gDpi = shotDpi;   /* screenshots at another scale */
-	{
-		int t = gTheme, a = gAccent;
-		loadSettings();
-		if (t) gTheme = t;              /* /theme and /accent win over the .ini */
-		if (a) gAccent = a;
-	}
+	loadSettings();
+	if (themeArg >= 0) gTheme = themeArg;     /* /theme and /accent win over the .ini, */
+	if (accentArg >= 0) gAccent = accentArg;  /* /theme:system and /accent:0 included */
 	if (langArg >= 0) gLang = langArg;
 	if (clearArg)
 	{

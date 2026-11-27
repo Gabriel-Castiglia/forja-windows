@@ -2,6 +2,30 @@
 
 [English](CHANGELOG.md) · **Español** · [日本語](CHANGELOG.ja.md)
 
+## 3.2.0 — 2026-11-27
+
+- **Cambiado:** el tiempo para adivinarla, bajo la barra de fuerza, ahora dice «segundos» por debajo de un minuto,
+  agrega «miles de años» entre los siglos y los millones, y por encima de «millones de años» sigue con «miles de
+  millones» y «billones de años» antes de «mucho más que la edad del universo», en los tres idiomas.
+- **Corregido:** `/accent:0` ahora manda sobre el color guardado en `forja.ini` (antes solo lo hacía un color
+  distinto del negro), y `/theme:system` (o `/theme:auto`) pide el tema como Windows, también sobre un tema claro u
+  oscuro guardado.
+- Los textos en español (ventana, Ayuda, instalador, README, guía) tratan al lector de *tú*, en español neutro.
+- `tools/check_options.py` demuestra que dos sorteos nunca dan la misma frase (la lista de la EFF no tiene una
+  palabra que sea el comienzo de otra, tampoco con las que llevan guion, como `t-shirt`), así que la entropía que se
+  muestra sigue siendo exacta sin separador y sin mayúsculas; ahora además vuelve a separar cada frase en palabras de
+  la lista, sea cual sea el separador. El autotest comprueba cada escalón del tiempo para adivinarla.
+- **Corregido:** elegir un tiempo en la lista «Borrar portapapeles a los» con el borrado desactivado ahora también
+  inicia la cuenta regresiva de la contraseña ya copiada, igual que al activar el borrado.
+- **Corregido:** una contraseña copiada se borra aunque otro programa tenga el portapapeles abierto en ese momento:
+  Forja reintenta cada segundo, hasta 30 segundos, en vez de rendirse.
+- **Corregido (menor):** los íconos de la barra de título y de la barra de tareas se dibujan a la escala del
+  monitor donde está la ventana.
+- Guías de uso rehechas en los tres idiomas: portada, índice con números de página, figuras numeradas, tablas, la
+  ventana con referencias numeradas, todas las opciones, menús, atajos y mensajes, la entropía explicada por tipo, e
+  imágenes nuevas. README en inglés y español ampliados (instalación, privacidad, perfiles, teclado, línea de
+  comandos); el README japonés quedó a la par.
+
 ## 3.1.2 — 2026-11-27
 
 - **Ícono nuevo**: un yunque y un martillo dibujados planos, en crema con contorno negro sobre el cuadrado del color
@@ -92,7 +116,7 @@
 ## 3.0.0 — 2026-11-20
 
 **Wyrmhold ahora es Forja**, un nombre más fácil de recordar: la forja, donde el metal toma forma a golpes de
-martillo, como cada contraseña acá sale del puro azar. El mismo número que Forja 3.0.0 para macOS. El ícono es el
+martillo, como cada contraseña aquí sale del puro azar. El mismo número que Forja 3.0.0 para macOS. El ícono es el
 yunque y los martillos de la tarjeta de Elwell and Taylor, herreros de Londres (c. 1766, British Museum, de dominio
 público). El repositorio ahora es `forja-windows` (GitHub redirige la dirección vieja).
 

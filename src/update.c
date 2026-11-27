@@ -39,8 +39,8 @@ static int parseVersion(const wchar_t* s, long v[4])
 		int digits = 0;
 		while (*s >= L'0' && *s <= L'9')
 		{
+			if (x > (0x7FFFFFFF - 9) / 10) return 0;     /* checked before it can overflow */
 			x = x * 10 + (*s++ - L'0');
-			if (x > 0x7FFFFFFF / 10) return 0;
 			digits++;
 		}
 		if (!digits || n == 4) return 0;

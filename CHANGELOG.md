@@ -2,6 +2,28 @@
 
 **English** · [Español](CHANGELOG.es.md) · [日本語](CHANGELOG.ja.md)
 
+## 3.2.0 — 2026-11-27
+
+- **Changed:** the guessing time under the strength bar now says "seconds" below a minute, adds "thousands of
+  years" between centuries and millions, and above "millions of years" goes on to "billions" and "trillions of
+  years" before "far longer than the age of the universe", in the three languages.
+- **Fixed:** `/accent:0` now wins over the colour saved in `forja.ini` (before, only a colour other than black did),
+  and `/theme:system` (or `/theme:auto`) asks for the follow-Windows theme, also over a saved light or dark one.
+- The Spanish texts (window, Help, installer, README, guide) address the reader as *tú*, in neutral Spanish.
+- `tools/check_options.py` proves that no two draws give the same passphrase (the EFF list is prefix-free, words
+  with a hyphen such as `t-shirt` included), so the entropy shown stays exact with no separator and no capitals; it
+  now reads every passphrase back into list words, whatever the separator. The self-test checks every step of the
+  guessing time.
+- **Fixed:** choosing a time in the "Clear clipboard after" list while clearing is off now also starts the countdown
+  for the password already copied, as switching clearing on does.
+- **Fixed:** a copied password is wiped even when another program holds the clipboard open at that moment: Forja
+  tries again every second, for up to 30 seconds, instead of giving up.
+- **Fixed (minor):** the title-bar and taskbar icons are drawn at the scale of the monitor the window is on.
+- User guides rebuilt in the three languages: cover, contents with page numbers, numbered figures, tables, the
+  window with numbered callouts, every option, menu, shortcut and message, the entropy explained by kind, and new
+  pictures. README in English and Spanish expanded (install, privacy, profiles, keyboard, command line); the
+  Japanese README brought level with them.
+
 ## 3.1.2 — 2026-11-27
 
 - **A new icon**: an anvil and a hammer drawn as a flat picture, cream with a black outline on the tile of the chosen

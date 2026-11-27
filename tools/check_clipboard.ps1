@@ -14,7 +14,7 @@
 #   3. Copy selected, then the window is closed -> the clipboard is empty at once;
 #   4. the empty forja.ini did not get the /clearafter value (it is for the session only).
 # The text on the clipboard before the run is put back at the end. Writes its report to the
-# file given as the first argument. src/forja.c /selftest checks the same in-process.
+# file given as the first argument. forja.exe /selftest (src/selftest.c) checks the same in-process.
 
 param([Parameter(Mandatory)] [string]$Report)
 
